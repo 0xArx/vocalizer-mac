@@ -1,0 +1,375 @@
+import AppKit
+import Combine
+import CoreAudio
+import ServiceManagement
+import VocalizerCore
+
+enum Mode: String, CaseIterable, Identifiable {
+    case live, balanced, quality, ultra
+    var id: String { rawValue }
+    var separation: VocalizerEngine.Separation {
+        switch self {
+        case .ultra: .deepFilter
+        case .live: .mdx(.live)
+        case .balanced: .mdx(.balanced)
+        case .quality: .mdx(.quality)
+        }
+    }
+    var title: String {
+        switch self {
+        case .ultra: "Speech"
+        case .live: "Live"
+        case .balanced: "Balanced"
+        case .quality: "Quality"
+        }
+    }
+    /// Algorithmic delay in ms (before buffering).
+    var latencyMs: Double {
+        switch self {
+        case .ultra: Double(DeepFilterSeparator.modelDelay + 480) / 48
+        case .live: SeparatorConfig.live.latencyMs
+        case .balanced: SeparatorConfig.balanced.latencyMs
+        case .quality: SeparatorConfig.quality.latencyMs
+        }
+    }
+    var hint: String {
+        switch self {
+        case .ultra: "ultra fast, for talking only; removes singing too"
+        case .live: "low delay, voices and singing"
+        case .balanced: "a little cleaner"
+        case .quality: "best separation, for music apps"
+        }
+    }
+    /// Expected capture-to-speaker delay: model delay + safety buffer + ~35 ms of audio IO.
+    func expectedDelayMs(sync: Bool) -> Double {
+        let buffer = sync ? syncJitterMs : (self == .quality ? 250 : self == .ultra ? 25 : 100)
+        return latencyMs + buffer + 35
+    }
+    /// Extra buffering in sync mode, where the delay is hidden from video anyway.
+    var syncJitterMs: Double { self == .quality ? 300 : self == .ultra ? 80 : 200 }
+}
+
+@MainActor
+final class AppModel: ObservableObject {
+    @Published var enabled = false {
+        didSet {
+            if enabled != oldValue { apply() }
+            // Remember it, so it comes back on after a restart (with Open at login).
+            if !restoring { UserDefaults.standard.set(enabled, forKey: "wasOn") }
+        }
+    }
+    private var restoring = false
+    @Published var openAtLogin = SMAppService.mainApp.status == .enabled {
+        didSet {
+            guard openAtLogin != oldValue else { return }
+            do {
+                if openAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            } catch {
+                self.error = "Open at login: \(error.localizedDescription)"
+                openAtLogin = SMAppService.mainApp.status == .enabled
+            }
+        }
+    }
+    @Published var sourceID = AudioSource.all.id { didSet { if sourceID != oldValue, enabled { apply() } } }
+    @Published var mode: Mode = .live { didSet { if mode != oldValue, enabled { apply() } } }
+    @Published var keepMusic = false { didSet { engine.stem = keepMusic ? .music : .vocals } }
+    /// Route all audio through the Vocalizer virtual device, which reports our delay so video players
+    /// hold the picture back by the same amount (lip sync).
+    @Published var syncVideo = UserDefaults.standard.object(forKey: "syncVideo") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(syncVideo, forKey: "syncVideo")
+            if syncVideo != oldValue, enabled { apply() }
+        }
+    }
+    @Published private(set) var driverInstalled = AudioProcesses.vocalizerDevice() != nil
+    @Published private(set) var reportedLatencyMs = 0.0
+    /// Engine starts since launch (diagnostics: should not climb while playing).
+    private(set) var starts = 0
+    var syncActive: Bool { syncVideo && driverInstalled }
+    @Published private(set) var sources: [AudioSource] = []
+    @Published private(set) var stats = EngineStats()
+    @Published private(set) var status = "Loading model…"
+    @Published private(set) var error: String?
+    @Published private(set) var ready = false
+    @Published private(set) var silentFor = 0.0
+
+    let engine = VocalizerEngine(modelURLs: AppModel.bundledModels(), deepFilter: AppModel.bundledDeepFilter())
+    private var timer: Timer?
+    private var lastHeard = Date()
+    private var outputListener: AudioObjectPropertyListenerBlock?
+
+    nonisolated static func bundledDeepFilter() -> (library: URL, model: URL)? {
+        guard let lib = Bundle.main.privateFrameworksURL?.appendingPathComponent("libdf.dylib"),
+              let model = Bundle.main.url(forResource: "DeepFilterNet3_onnx.tar", withExtension: "gz"),
+              FileManager.default.fileExists(atPath: lib.path) else { return nil }
+        return (lib, model)
+    }
+
+    nonisolated static func bundledModels() -> [Int: URL] {
+        var out: [Int: URL] = [:]
+        for f in [32, 64, 256] {
+            if let url = Bundle.main.url(forResource: "MDXVocals\(f)", withExtension: "mlmodelc") { out[f] = url }
+        }
+        return out
+    }
+
+    init() {
+        refreshSources()
+        Task.detached(priority: .userInitiated) { [engine] in
+            do {
+                try engine.preload()
+                await MainActor.run {
+                    self.ready = true
+                    self.status = "Ready"
+                    // Resume where the user left off (not in the test modes, which drive `enabled` themselves).
+                    let testing = CommandLine.arguments.contains { $0.hasPrefix("--") }
+                    if !testing && UserDefaults.standard.bool(forKey: "wasOn") {
+                        self.restoring = true
+                        self.enabled = true
+                        self.restoring = false
+                    }
+                }
+            } catch {
+                await MainActor.run { self.error = "Model failed to load: \(error.localizedDescription)" }
+            }
+        }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.tick() }
+        }
+        // Follow the default output device (headphones plugged in, AirPods, etc.).
+        var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                              mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            Task { @MainActor in self?.defaultOutputChanged() }
+        }
+        outputListener = block
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, .main, block)
+
+        // If we quit or crashed while routing through the Vocalizer device, give the speakers back.
+        restoreRealOutput()
+        installSignalHandlers()
+
+        // Volume keys / mute act on the Vocalizer device while routed: pass them on to the real speakers.
+        for sel in [kAudioDevicePropertyVolumeScalar, kAudioDevicePropertyMute] {
+            if let v = AudioProcesses.vocalizerDevice() {
+                var a = AudioObjectPropertyAddress(mSelector: sel, mScope: kAudioObjectPropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+                let b: AudioObjectPropertyListenerBlock = { [weak self] _, _ in Task { @MainActor in self?.vocalizerVolumeChanged() } }
+                listeners.append(b)
+                AudioObjectAddPropertyListenerBlock(v, &a, .main, b)
+            }
+        }
+        // Speakers unplugged / plugged in: if the real output disappears, move to the next one.
+        var devicesAddr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        let devicesBlock: AudioObjectPropertyListenerBlock = { [weak self] _, _ in Task { @MainActor in self?.devicesChanged() } }
+        listeners.append(devicesBlock)
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &devicesAddr, .main, devicesBlock)
+        // After sleep the audio hardware may have been reset.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { if self?.enabled == true { self?.apply() } }
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.engine.stop()
+                self?.restoreRealOutput()
+            }
+        }
+    }
+
+    private var listeners: [AudioObjectPropertyListenerBlock] = []
+    private var activeRealUID: String?
+
+    // MARK: volume pass-through (sync mode)
+
+    /// Shows the real speakers' level on the Vocalizer device (so the volume slider starts where it was).
+    private func mirrorVolumeFromReal(_ real: AudioDeviceID) {
+        guard let v = AudioProcesses.vocalizerDevice() else { return }
+        syncingVolume = true
+        if let vol = AudioProcesses.volume(real) { AudioProcesses.setVolume(v, vol) }
+        if let m = AudioProcesses.isMuted(real) { AudioProcesses.setMuted(v, m) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.syncingVolume = false }
+        engine.outputGain = 1
+    }
+    private var syncingVolume = false
+
+    private func vocalizerVolumeChanged() {
+        guard enabled, syncActive, !syncingVolume, let v = AudioProcesses.vocalizerDevice(),
+              let uid = activeRealUID, let real = AudioProcesses.device(uid: uid) else { return }
+        let vol = AudioProcesses.volume(v) ?? 1
+        let muted = AudioProcesses.isMuted(v) ?? false
+        let hw = AudioProcesses.setVolume(real, vol)
+        let hwMute = AudioProcesses.setMuted(real, muted)
+        // No hardware volume on the speakers: apply it ourselves (roughly the macOS curve).
+        engine.outputGain = (hw ? 1 : powf(vol, 3)) * (muted && !hwMute ? 0 : 1)
+    }
+
+    private func devicesChanged() {
+        guard enabled, syncActive, let uid = activeRealUID else { return }
+        if AudioProcesses.device(uid: uid) == nil {
+            NSLog("Vocalizer: output \(uid) disappeared, moving to the next one")
+            realOutputUID = nil
+            apply()
+        }
+    }
+
+    private func installSignalHandlers() {
+        for sig in [SIGTERM, SIGINT, SIGHUP] {
+            signal(sig, SIG_IGN)
+            let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            src.setEventHandler { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.engine.stop()
+                    self?.restoreRealOutput()
+                }
+                exit(0)
+            }
+            src.resume()
+            signalSources.append(src)
+        }
+    }
+    private var signalSources: [DispatchSourceSignal] = []
+
+    // MARK: real output device (the speakers/headphones the vocals play on in sync mode)
+
+    private var realOutputUID: String? {
+        get { UserDefaults.standard.string(forKey: "realOutputUID") }
+        set { UserDefaults.standard.set(newValue, forKey: "realOutputUID") }
+    }
+
+    private func realOutput() -> AudioDeviceID? {
+        let vocalizer = AudioProcesses.vocalizerDevice()
+        if let d = try? AudioProcesses.defaultOutputDevice(), d != vocalizer { return d }
+        if let uid = realOutputUID, let d = AudioProcesses.device(uid: uid) { return d }
+        return AudioProcesses.devices().first { $0 != vocalizer && AudioProcesses.hasOutput($0)
+            && !(AudioProcesses.uid(of: $0) ?? "").lowercased().hasPrefix("vocalizer") }
+    }
+
+    private func restoreRealOutput() {
+        guard let v = AudioProcesses.vocalizerDevice(), (try? AudioProcesses.defaultOutputDevice()) == v,
+              let real = realOutput() else { return }
+        setDefaultOutput(real)
+    }
+
+    /// Our own default-output switches also fire the listener; ignore them for a moment.
+    private var ignoreOutputChangesUntil = Date.distantPast
+
+    private func setDefaultOutput(_ device: AudioDeviceID) {
+        ignoreOutputChangesUntil = Date().addingTimeInterval(1.5)
+        try? AudioProcesses.setDefaultOutput(device)
+    }
+
+    private func defaultOutputChanged() {
+        guard enabled, Date() > ignoreOutputChangesUntil else { return }
+        if syncActive {
+            // Ignore our own switch to the Vocalizer device; any other choice becomes the new real output.
+            if let d = try? AudioProcesses.defaultOutputDevice(), d == AudioProcesses.vocalizerDevice() { return }
+        }
+        apply()
+    }
+
+    /// Tells apps our delay, once per start. It is fixed while running (the engine holds it exactly), so
+    /// video never has to re-sync. Apps read it when they (re)open the device, so after a mode change
+    /// (device already selected) bounce the default output once.
+    private func reportLatency(bounce: Bool) {
+        guard let v = AudioProcesses.vocalizerDevice(), let real = realOutput() else { return }
+        let s = engine.stats
+        let ms = s.totalLatencyMs
+        let rate = (try? CA_nominalRate(v)) ?? 48_000
+        try? AudioProcesses.setVocalizerLatency(frames: Int(ms / 1000 * rate))
+        reportedLatencyMs = ms
+        let current = try? AudioProcesses.defaultOutputDevice()
+        if current == v && bounce { setDefaultOutput(real) }
+        if current != v || bounce { setDefaultOutput(v) }
+    }
+
+    var source: AudioSource {
+        if sourceID == AudioSource.all.id { return .all }
+        return sources.first { $0.id == sourceID } ?? .all
+    }
+
+    func refreshSources() {
+        let fresh = AudioProcesses.list()
+        if fresh != sources { sources = fresh }
+    }
+
+    private func apply() {
+        driverInstalled = AudioProcesses.vocalizerDevice() != nil
+        guard enabled else {
+            engine.stop()
+            restoreRealOutput()
+            reportedLatencyMs = 0
+            status = ready ? "Off" : status
+            stats = engine.stats
+            return
+        }
+        guard ready else { status = "Loading model…"; return }
+        error = nil
+        refreshSources()
+        do {
+            if syncActive {
+                guard let real = realOutput() else { throw CAError(-1, "no output device to play on") }
+                realOutputUID = AudioProcesses.uid(of: real)
+                activeRealUID = realOutputUID
+                mirrorVolumeFromReal(real)
+                // Sync mode: latency is hidden from video, so buffer generously (no dropouts).
+                let wasRouted = (try? AudioProcesses.defaultOutputDevice()) == AudioProcesses.vocalizerDevice()
+                try engine.start(source: .virtualDevice, separation: mode.separation,
+                                 jitterMs: mode.syncJitterMs, outputDevice: real, fixedDelay: true)
+                reportLatency(bounce: wasRouted)
+            } else {
+                restoreRealOutput()
+                try engine.start(source: source, separation: mode.separation)
+            }
+            lastHeard = Date()
+            starts += 1
+            status = "On"
+        } catch {
+            self.error = error.localizedDescription
+            NSLog("Vocalizer: start failed: \(error)")
+            enabled = false
+        }
+    }
+
+    /// Installs the bundled Vocalizer.driver (asks for the admin password via the macOS dialog).
+    func installDriver() {
+        guard let driver = Bundle.main.url(forResource: "Vocalizer", withExtension: "driver") else {
+            error = "Driver missing from the app bundle"; return
+        }
+        let dest = "/Library/Audio/Plug-Ins/HAL/Vocalizer.driver"
+        let cmd = "rm -rf '\(dest)' && cp -R '\(driver.path)' '\(dest)' && chown -R root:wheel '\(dest)' && killall coreaudiod"
+        let script = "do shell script \"\(cmd)\" with administrator privileges with prompt \"Vocalizer wants to install its audio device so video stays in sync.\""
+        var err: NSDictionary?
+        NSAppleScript(source: script)?.executeAndReturnError(&err)
+        if let err { error = (err[NSAppleScript.errorMessage] as? String) ?? "Install cancelled"; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.driverInstalled = AudioProcesses.vocalizerDevice() != nil
+            if self?.enabled == true { self?.apply() }
+        }
+    }
+
+    private var ticks = 0
+
+    private func tick() {
+        // Keep the Source list current (apps that start or stop playing) without a refresh button.
+        ticks += 1
+        if ticks % 4 == 0 { refreshSources() }
+        if !ready { return }
+        if enabled && !engine.stats.running { apply() }
+        stats = engine.stats
+        if stats.running {
+            if stats.inputPeak > 1e-4 { lastHeard = Date() }
+            silentFor = Date().timeIntervalSince(lastHeard)
+        } else {
+            silentFor = 0
+        }
+    }
+}
+
+private func CA_nominalRate(_ device: AudioDeviceID) throws -> Double {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyNominalSampleRate,
+                                          mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    var rate: Float64 = 0
+    var size = UInt32(MemoryLayout<Float64>.size)
+    let err = AudioObjectGetPropertyData(device, &addr, 0, nil, &size, &rate)
+    guard err == noErr else { throw CAError(err, "nominal rate") }
+    return rate
+}

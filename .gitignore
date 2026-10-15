@@ -1,0 +1,8 @@
+.build/
+build/
+tools/.venv/
+tools/*.onnx
+fixtures/
+*.mlmodelc
+Driver/VocalizerDriver.c
+.DS_Store
