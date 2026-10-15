@@ -55,6 +55,12 @@ struct MenuView: View {
                 .onAppear { model.refreshSources() }
             }
 
+            Picker("Output", selection: Binding(get: { model.currentOutputUID ?? "" },
+                                                set: { model.choose(output: $0) })) {
+                ForEach(model.outputs) { o in Text(o.name).tag(o.id) }
+            }
+            .onAppear { model.refreshOutputs() }
+
             Text("Mode").font(.subheadline)
             Picker("Mode", selection: $model.mode) {
                 ForEach(model.availableModes) { m in Text(m.title).tag(m) }

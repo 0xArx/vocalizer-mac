@@ -184,6 +184,22 @@ public enum AudioProcesses {
         return AudioObjectHasProperty(device, &addr) && AudioObjectSetPropertyData(device, &addr, 0, nil, 4, &m) == noErr
     }
 
+    /// Sets the name the Vocalizer device shows in Control Center / Sound settings.
+    public static func setVocalizerName(_ name: String) {
+        guard let dev = vocalizerDevice() else { return }
+        var addr = CA.address(0x766E_616D) // 'vnam'
+        var str = name as CFString
+        AudioObjectSetPropertyData(dev, &addr, 0, nil, UInt32(MemoryLayout<CFString>.size), &str)
+    }
+
+    /// Real output devices the user can play on (not the Vocalizer device, not our private aggregates).
+    public static func realOutputs() -> [(id: AudioDeviceID, uid: String, name: String)] {
+        devices().compactMap { d in
+            guard hasOutput(d), let uid = uid(of: d), !uid.lowercased().hasPrefix("vocalizer") else { return nil }
+            return (d, uid, name(of: d) ?? uid)
+        }
+    }
+
     public static func outputLatencyFrames(_ device: AudioDeviceID) -> UInt32 {
         (try? CA.get(device, kAudioDevicePropertyLatency, UInt32(0), scope: kAudioObjectPropertyScopeOutput)) ?? 0
     }

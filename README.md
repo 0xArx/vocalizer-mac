@@ -54,6 +54,9 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 - **Keep video in sync** (on by default): all sound goes through the *Vocalizer* audio device, which tells video
   players the delay, so the picture waits for the voice. Your speakers or headphones stay the real output, the volume
   keys keep working, and your speakers come back when you switch it off or quit.
+- **Headphones / AirPods:** plug them in and the sound moves there (unplug and it goes back). The output list in
+  Control Center shows **Vocalizer (your headphones)** so you can see where the sound really goes, and the
+  **Output** picker in the Vocalizer menu switches it directly.
 - With sync off, you can pick a single app to filter (Source).
 - **Open at login** is in the menu; Vocalizer remembers whether it was on.
 - Things that can't wait (games, live calls) still hear the delay. Use Speech mode for calls.

@@ -205,13 +205,63 @@ final class AppModel: ObservableObject {
         engine.outputGain = (hw ? 1 : powf(vol, 3)) * (muted && !hwMute ? 0 : 1)
     }
 
+    /// Output devices seen so far (to tell "plugged in" from "unplugged"), and where we played before.
+    private var knownOutputUIDs = Set(AudioProcesses.realOutputs().map(\.uid))
+    private var outputHistory: [String] = []
+
+    /// Plugging in headphones / connecting AirPods moves the sound to them, like macOS does; unplugging
+    /// goes back to the previous output that is still there.
     private func devicesChanged() {
-        guard enabled, syncActive, let uid = activeRealUID else { return }
-        if AudioProcesses.device(uid: uid) == nil {
-            NSLog("Vocalizer: output \(uid) disappeared, moving to the next one")
-            realOutputUID = nil
+        let outputs = AudioProcesses.realOutputs()
+        let current = Set(outputs.map(\.uid))
+        let added = outputs.filter { !knownOutputUIDs.contains($0.uid) }
+        knownOutputUIDs = current
+        refreshOutputs()
+        guard enabled, syncActive else { return }
+        if let new = added.last {
+            NSLog("Vocalizer: \(new.name) connected, playing there")
+            choose(output: new.uid)
+        } else if let uid = activeRealUID, !current.contains(uid) {
+            while let previous = outputHistory.popLast() {
+                if current.contains(previous) { realOutputUID = previous; break }
+            }
+            if let uid = realOutputUID, !current.contains(uid) { realOutputUID = nil }
+            NSLog("Vocalizer: output \(uid) disappeared, back to \(realOutputUID ?? "default")")
             apply()
         }
+    }
+
+    // MARK: output picker
+
+    @Published private(set) var outputs: [OutputChoice] = []
+    @Published private(set) var currentOutputUID: String?
+    struct OutputChoice: Identifiable, Hashable { let id: String; let name: String }
+
+    func refreshOutputs() {
+        let list = AudioProcesses.realOutputs().map { OutputChoice(id: $0.uid, name: $0.name) }
+        if list != outputs { outputs = list }
+        if syncActive && enabled {
+            currentOutputUID = activeRealUID
+        } else if let d = try? AudioProcesses.defaultOutputDevice(), let uid = AudioProcesses.uid(of: d),
+                  !uid.lowercased().hasPrefix("vocalizer") {
+            currentOutputUID = uid
+        } else {
+            currentOutputUID = realOutputUID
+        }
+    }
+
+    /// Plays on this output (sync: our real output; otherwise the system default).
+    func choose(output uid: String) {
+        guard let dev = AudioProcesses.device(uid: uid) else { return }
+        if enabled && syncActive {
+            guard uid != activeRealUID else { return }
+            realOutputUID = uid
+            apply()
+        } else {
+            setDefaultOutput(dev)
+            realOutputUID = uid
+        }
+        currentOutputUID = uid
     }
 
     private func installSignalHandlers() {
@@ -242,11 +292,13 @@ final class AppModel: ObservableObject {
         let vocalizer = AudioProcesses.vocalizerDevice()
         if let d = try? AudioProcesses.defaultOutputDevice(), d != vocalizer { return d }
         if let uid = realOutputUID, let d = AudioProcesses.device(uid: uid) { return d }
-        return AudioProcesses.devices().first { $0 != vocalizer && AudioProcesses.hasOutput($0)
-            && !(AudioProcesses.uid(of: $0) ?? "").lowercased().hasPrefix("vocalizer") }
+        let outputs = AudioProcesses.realOutputs()
+        // Prefer the Mac's own speakers/headphones over anything else.
+        return (outputs.first { $0.uid.contains("BuiltIn") } ?? outputs.first)?.id
     }
 
     private func restoreRealOutput() {
+        AudioProcesses.setVocalizerName("Vocalizer")
         guard let v = AudioProcesses.vocalizerDevice(), (try? AudioProcesses.defaultOutputDevice()) == v,
               let real = realOutput() else { return }
         setDefaultOutput(real)
@@ -296,9 +348,11 @@ final class AppModel: ObservableObject {
 
     private func apply() {
         driverInstalled = AudioProcesses.vocalizerDevice() != nil
+        defer { refreshOutputs() }
         guard enabled else {
             engine.stop()
             restoreRealOutput()
+            AudioProcesses.setVocalizerName("Vocalizer")
             reportedLatencyMs = 0
             status = ready ? "Off" : status
             stats = engine.stats
@@ -311,7 +365,13 @@ final class AppModel: ObservableObject {
             if syncActive {
                 guard let real = realOutput() else { throw CAError(-1, "no output device to play on") }
                 realOutputUID = AudioProcesses.uid(of: real)
+                if let old = activeRealUID, old != realOutputUID {
+                    outputHistory.removeAll { $0 == old }
+                    outputHistory.append(old)
+                }
                 activeRealUID = realOutputUID
+                // Control Center / Sound settings show where the sound really goes.
+                AudioProcesses.setVocalizerName("Vocalizer (\(AudioProcesses.name(of: real) ?? "speakers"))")
                 mirrorVolumeFromReal(real)
                 // Sync mode: latency is hidden from video, so buffer generously (no dropouts).
                 let wasRouted = (try? AudioProcesses.defaultOutputDevice()) == AudioProcesses.vocalizerDevice()
