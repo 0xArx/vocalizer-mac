@@ -83,6 +83,8 @@ final class AppModel: ObservableObject {
     }
     @Published private(set) var driverInstalled = AudioProcesses.vocalizerDevice() != nil
     @Published private(set) var reportedLatencyMs = 0.0
+    /// Modes this build can run (Speech needs the optional DeepFilterNet library).
+    let availableModes: [Mode] = Mode.allCases.filter { $0 != .ultra || AppModel.bundledDeepFilter() != nil }
     /// Engine starts since launch (diagnostics: should not climb while playing).
     private(set) var starts = 0
     var syncActive: Bool { syncVideo && driverInstalled }
@@ -108,7 +110,8 @@ final class AppModel: ObservableObject {
     nonisolated static func bundledModels() -> [Int: URL] {
         var out: [Int: URL] = [:]
         for f in [32, 64, 256] {
-            if let url = Bundle.main.url(forResource: "MDXVocals\(f)", withExtension: "mlmodelc") { out[f] = url }
+            if let url = Bundle.main.url(forResource: "MDXVocals\(f)", withExtension: "mlmodelc")
+                ?? Bundle.main.url(forResource: "MDXVocals\(f)", withExtension: "mlpackage") { out[f] = url }
         }
         return out
     }

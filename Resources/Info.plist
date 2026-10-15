@@ -6,6 +6,8 @@
 	<string>Vocalizer</string>
 	<key>CFBundleDisplayName</key>
 	<string>Vocalizer</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.0xarx.vocalizer-mac</string>
 	<key>CFBundleExecutable</key>

@@ -1,46 +1,66 @@
-# Vocalizer for Mac (prototype)
+<p align="center"><img src="docs/icon.png" width="128" alt="Vocalizer icon"></p>
 
-A menu bar app that removes the music from any app's sound, system wide, and keeps the voices.
-It taps the app's audio with a Core Audio process tap (which also mutes the app), separates it with the
-UVR MDX-Net vocal model on the Neural Engine, and plays the vocals to your output device.
-Nothing leaves the Mac.
+# Vocalizer for Mac
 
-![menu](docs-menu.png)
+**Removes the music from anything your Mac plays and keeps the voices.** YouTube, Apple Music, Spotify, podcasts,
+any app. It runs entirely on your Mac (Neural Engine), and with the optional audio device it keeps video lips in
+sync with the voice.
 
-## Build and run
+<p align="center"><img src="docs-menu.png" width="330" alt="Vocalizer menu"></p>
 
-Needs macOS 14.2+ on Apple silicon, Xcode command line tools, Swift 5.10+.
+## Install
+
+Needs an **Apple silicon Mac** (M1 or later) on **macOS 14.2+**. Paste into Terminal:
 
 ```bash
-scripts/build-app.sh --install   # builds build/Vocalizer.app and copies it to /Applications
-open /Applications/Vocalizer.app
+curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/install.sh | bash
 ```
 
-Apple silicon only (by choice; Intel is not built). **Open at login** is in the menu, and the on/off state is
-remembered across restarts.
+That downloads the latest release, puts **Vocalizer** in Applications, installs the Vocalizer audio device (macOS
+asks for your password once) and opens the app. Then:
 
-The first time it taps audio, macOS asks for **System Audio Recording** permission
-(System Settings › Privacy & Security › Screen & System Audio Recording). The app shows a warning if no audio
-arrives. The Core ML models are already in `Models/`; to rebuild them from the ONNX file see "Models" below.
+1. Click the **microphone icon** in the menu bar and switch it on.
+2. macOS asks to allow **System Audio Recording**: click **Allow**.
+3. Play something. The music is gone; the voices stay.
 
-In the menu: switch it on, pick a **Mode**, optionally **Karaoke** to keep the music and drop the voices.
-The status shows the latency, speed and levels.
+Installing with a coding agent (Claude Code, Codex, Cursor...)? Just ask it to "install Vocalizer from
+github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is also a ready-made agent skill in
+[`skills/install-vocalizer`](skills/install-vocalizer/SKILL.md).
 
-**Keep video in sync** (on by default once the Vocalizer audio device is installed): all audio is routed
-through a virtual output device called *Vocalizer*, which reports Vocalizer's real delay as its output latency.
-Video players (Chrome/YouTube, Safari, QuickTime, ...) then hold the picture back by that delay, so lips match
-the voice in every mode, even Quality. Your speakers stay the real output; switching to headphones in Sound
-settings is picked up automatically, and the speakers are restored when you switch it off or quit.
-The device is installed from the menu (**Install…**, asks for your admin password once) or with
-`scripts/install-driver.sh` (`--remove` to uninstall). With sync off, the **Source** picker taps one app
-(or all audio) directly and video runs ahead of the voice by the delay.
+<details>
+<summary>Other ways to install</summary>
 
-| Mode | Model | Delay (measured, end to end) | Best for |
-|---|---|---|---|
-| **Speech** (ultra fast) | DeepFilterNet3 (CPU) | **86 ms** | speech: talks, vlogs, calls. Weak on singing |
-| **Live** | MDX-Net, 0.74 s window | 295 ms (tap) / 394 ms (sync, extra buffer) | videos with music and singing |
-| **Balanced** | MDX-Net, 1.5 s window | 348 ms | a little cleaner |
-| **Quality** | MDX-Net, 5.9 s window | 1.9 s | music apps, or any video with sync on |
+- **Without the audio device** (no video sync, no password): `curl -fsSL .../install.sh | bash -s -- --no-driver`
+- **Build from source** (needs Xcode or `xcode-select --install`):
+  `curl -fsSL .../install.sh | bash -s -- --from-source` (add `--with-speech` for Speech mode; needs `brew install rust`)
+- **Manually:** download `Vocalizer-macOS.zip` from [Releases](https://github.com/0xArx/vocalizer-mac/releases),
+  move `Vocalizer.app` to Applications, open it, and use **Install…** in its menu for the audio device. Because the app
+  is not notarized yet, macOS may block the first launch: System Settings › Privacy & Security › **Open Anyway**.
+- **For development:** `git clone`, then `scripts/build-app.sh --install` (see [AGENTS.md](AGENTS.md)).
+
+</details>
+
+**Uninstall:** `curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash`
+
+## Using it
+
+| Mode | Delay (sync on) | Best for |
+|---|---|---|
+| **Live** (default) | about 0.4 s | videos, music with singing |
+| **Balanced** | about 0.5 s | a little cleaner |
+| **Quality** | about 1.9 s | music apps (cleanest) |
+| **Speech** | about 0.15 s | talks, vlogs, calls. Also removes singing |
+
+- **Keep video in sync** (on by default): all sound goes through the *Vocalizer* audio device, which tells video
+  players the delay, so the picture waits for the voice. Your speakers or headphones stay the real output, the volume
+  keys keep working, and your speakers come back when you switch it off or quit.
+- With sync off, you can pick a single app to filter (Source).
+- **Open at login** is in the menu; Vocalizer remembers whether it was on.
+- Things that can't wait (games, live calls) still hear the delay. Use Speech mode for calls.
+
+## Privacy
+
+Everything runs locally. Audio is never recorded to disk or sent anywhere. The app has no network code.
 
 ## How it works
 
@@ -142,19 +162,19 @@ permission is needed) and plays the vocals on the real output through the same a
 - Apps read the latency when they open the device, so a mode change briefly switches the default output away and
   back to make them re-read it (one re-sync). If a video still looks off after switching modes, pause and play it.
 
-### Ultra fast (DeepFilterNet3)
+### Speech mode (DeepFilterNet3)
 
 A speech enhancement model (github.com/Rikorose/DeepFilterNet, MIT/Apache-2.0) that treats music as noise:
 48 kHz, 10 ms frames, 2 frames of look-ahead (31 ms algorithmic), about 4.5 ms of CPU per 10 ms frame for stereo.
 Built from source with `cargo build --release -p deep_filter --no-default-features --features capi` (Rust from Homebrew);
-`scripts/build-app.sh` bundles `libdf.dylib` and the model when `../vendor/DeepFilterNet` exists.
+`scripts/build-deepfilter.sh` builds it (pinned commit) and `scripts/build-app.sh` bundles it when present.
 
 | Same audio as above | Delay | SDR |
 |---|---|---|
 | Speech over synthetic music | 31 ms | 9.5 dB (MDX Live: 19.0) |
 | Real songs (MUSDB18) | 31 ms | 1.2 dB (MDX Live: 9.8; doing nothing: −3.8) |
 
-So Ultra is for spoken content; for singing use Live (or Quality with sync on).
+So Speech mode is for spoken content; for singing use Live (or Quality with sync on).
 
 ## Where it works
 
@@ -179,7 +199,7 @@ Delay can't be hidden from calls and games (use Speech mode, ~0.15 s with sync o
 
 - **Delay is unavoidable, but hidden with sync on.** Without the virtual device, Live is about 0.3 s behind the source
   and lips visibly lead the voice. With **Keep video in sync**, players delay the picture to match.
-  Things that cannot be delayed (games, live calls) still hear the delay; use Ultra for those.
+  Things that cannot be delayed (games, live calls) still hear the delay; use Speech mode for those.
 - **Small pops (fixed).** The Neural Engine occasionally takes 100–175 ms for a 20 ms call. The output buffer now
   grows by 40 ms after any dropout and fades out/in around it, so it settles without clicks; Live starts with a
   100 ms buffer (sync mode 200 ms, hidden from video).
@@ -198,6 +218,9 @@ Delay can't be hidden from calls and games (use Speech mode, ~0.15 s with sync o
 - Not notarized; it is a local prototype.
 
 ## Files
+
+Developers and agents: see [AGENTS.md](AGENTS.md) for the build, layout and rules.
+
 
 | | |
 |---|---|
@@ -218,7 +241,7 @@ Delay can't be hidden from calls and games (use Speech mode, ~0.15 s with sync o
 python3.11 -m venv tools/.venv && tools/.venv/bin/pip install onnx onnx2torch torch coremltools numpy onnxruntime musdb
 
 # Models: ONNX -> Core ML (window sizes as arguments)
-tools/.venv/bin/python tools/convert.py ../vocalizer/extension/models/mdx-vocals.onnx Models 256 64 32
+tools/.venv/bin/python tools/convert.py UVR-MDX-NET-vocals.onnx Models 256 64 32   # the UVR MDX-Net vocals ONNX (n_fft 7680)
 
 # Fixtures: synthetic (say + synth music) and real music (MUSDB18 7 s samples, 140 MB download)
 tools/.venv/bin/python tools/make_fixture.py fixtures
@@ -235,3 +258,14 @@ tools/.venv/bin/python tools/analyze_loopback.py fixtures/app-live fixtures/musd
 # Tap a running app instead of afplay
 open -W -n build/Vocalizer.app --args --selftest app:com.apple.Music 12 live $PWD/fixtures/app-music
 ```
+
+## Credits and licenses
+
+- **Vocalizer app code:** MIT, see [LICENSE](LICENSE).
+- **Audio device (`Driver/`):** based on [BlackHole](https://github.com/ExistentialAudio/BlackHole) by Existential
+  Audio, **GPL-3.0** ([Driver/LICENSE-BlackHole](Driver/LICENSE-BlackHole)). The full source of the modified driver
+  is in `Driver/`.
+- **Vocal model:** UVR MDX-Net vocals by the [Ultimate Vocal Remover](https://github.com/Anjok07/ultimatevocalremovergui)
+  team (MIT, credit requested), converted to Core ML here. MDX-Net architecture by KUIELab.
+- **Speech mode:** [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) by Hendrik Schröter (MIT / Apache-2.0).
+- Test data (not included): MUSDB18 7-second samples.

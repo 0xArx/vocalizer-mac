@@ -57,7 +57,7 @@ struct MenuView: View {
 
             Text("Mode").font(.subheadline)
             Picker("Mode", selection: $model.mode) {
-                ForEach(Mode.allCases) { m in Text(m.title).tag(m) }
+                ForEach(model.availableModes) { m in Text(m.title).tag(m) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()

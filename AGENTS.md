@@ -1,0 +1,113 @@
+# AGENTS.md: Vocalizer for Mac
+
+Instructions for coding agents (Claude Code, Codex, Cursor, Copilot, ...) asked to **install Vocalizer for a user**
+or to **work on its code**. Humans: see [README.md](README.md).
+
+Vocalizer is a macOS menu bar app that removes the music from any app's sound and keeps the voices. It captures
+audio with Core Audio process taps, separates it on the Neural Engine (UVR MDX-Net, converted to Core ML), and plays
+the vocals on the user's speakers. An optional virtual audio device ("Vocalizer") reports the processing delay so
+video players hold the picture back and lips stay in sync.
+
+## Install it for the user
+
+### 1. Check the Mac (stop and tell the user if either fails)
+
+```bash
+uname -m              # must be arm64 (Apple silicon). Intel Macs are not supported.
+sw_vers -productVersion   # must be 14.2 or later
+```
+
+### 2. Run the installer
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/install.sh | bash
+```
+
+It downloads the latest prebuilt release, copies `Vocalizer.app` to `/Applications`, installs the audio device to
+`/Library/Audio/Plug-Ins/HAL/Vocalizer.driver`, restarts Core Audio, and opens the app. No compiler is needed.
+
+Options (pass after `bash -s --`, e.g. `curl ... | bash -s -- --no-driver`):
+
+| Option | Use when |
+|---|---|
+| `--no-driver` | the user does not want an audio device / no admin rights. Everything works except video sync. |
+| `--from-source` | no release is available, or the user wants to build it. Needs `swift` (Xcode or `xcode-select --install`). |
+| `--with-speech` | with `--from-source`: also build the optional Speech mode (needs Rust: `brew install rust`). |
+| `--no-launch` | don't open the app afterwards. |
+
+### 3. Things only the user can do (tell them, don't try to do them yourself)
+
+1. **Admin password.** Installing the audio device shows the standard macOS password dialog. Ask the user to type
+   their password there. Never ask for the password in chat and never type it.
+2. **System Audio Recording permission.** The first time they switch Vocalizer on, macOS asks to allow
+   *System Audio Recording*. They must click **Allow**. If they missed it: System Settings › Privacy & Security ›
+   Screen & System Audio Recording › turn on **Vocalizer**.
+3. **Switch it on.** Click the microphone icon in the menu bar and flip the switch. Mode **Live** is the default.
+
+### 4. Verify (optional)
+
+```bash
+pgrep -lf /Applications/Vocalizer.app                       # running
+system_profiler SPAudioDataType | grep -A3 "Vocalizer:"     # audio device present
+/Applications/Vocalizer.app/Contents/MacOS/Vocalizer --list  # apps currently producing audio
+```
+
+An end-to-end check that plays a file and measures the result (it plays sound for N seconds; the user's
+Vocalizer must be switched off first because it refuses to run while the device is already the default output):
+
+```bash
+open -W -n /Applications/Vocalizer.app --args --selftest /path/to/song.wav 10 sync-live /tmp/vocalizer-test
+cat /tmp/vocalizer-test/log.txt    # input/output levels, latency, underruns
+```
+
+The self-test must run inside the app bundle (via `open`): a bare command line process gets silence because only
+app bundles can hold the System Audio Recording permission.
+
+### 5. Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash
+```
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| No sound at all after quitting | Vocalizer restores the speakers when it quits; if it was killed hard, reopen it once, or pick the speakers in System Settings › Sound. |
+| Switched on, but nothing changes / "No audio is coming in" | System Audio Recording permission is off (step 3.2). |
+| Menu shows "Needs the Vocalizer audio device" | Re-run the installer, or click **Install…** in the menu. |
+| Video slightly out of sync after changing modes | Pause and play the video once (players read the delay when they open the device). |
+| Music not fully removed | Expected on heavy reverb / backing vocals. Try **Quality** mode. **Speech** mode is for talking only. |
+
+## Work on the code
+
+```bash
+git clone https://github.com/0xArx/vocalizer-mac && cd vocalizer-mac
+scripts/build-app.sh            # -> build/Vocalizer.app   (--install also copies it to /Applications)
+scripts/build-deepfilter.sh     # optional Speech mode (Rust)
+Driver/build-driver.sh          # audio device -> build/Vocalizer.driver; scripts/install-driver.sh installs it
+swift build -c release && .build/release/vocalizer-bench Models fixtures/musdb-fixture all presets  # offline quality/speed
+```
+
+Layout:
+
+| Path | What |
+|---|---|
+| `Sources/VocalizerCore/VocalizerEngine.swift` | tap + private aggregate device + real-time IO proc, lock-free rings, worker thread |
+| `Sources/VocalizerCore/StreamingSeparator.swift` | sliding-window MDX separation, presets (live / balanced / quality) |
+| `Sources/VocalizerCore/MDXSpectrogram.swift`, `MDXModel.swift` | STFT/iSTFT matching UVR, Core ML wrapper |
+| `Sources/VocalizerCore/DeepFilterSeparator.swift` | Speech mode (DeepFilterNet3 via `libdf.dylib`, loaded at runtime) |
+| `Sources/VocalizerCore/AudioProcesses.swift` | process list, devices, volume, the Vocalizer device's `'vlat'` latency property |
+| `Sources/VocalizerMac/` | SwiftUI menu bar app; `main.swift` also has `--selftest`, `--sync-run`, `--snapshot`, `--list` |
+| `Driver/` | `BlackHole.c` (GPL-3.0) + `patch.py` that turns it into the Vocalizer device |
+| `Models/` | Core ML packages (32 / 64 / 256-frame windows); `tools/convert.py` regenerates them from ONNX |
+| `tools/` | Python: model conversion, test fixtures (MUSDB18 samples), loopback analysis |
+
+Rules that matter:
+
+- **Never block the IO thread** (`VocalizerEngine.io`): no locks, allocation, logging or Swift arrays that grow.
+- **In sync mode the delay is fixed** for the whole run (`fixedDelay: true`) and reported once. Changing it while a
+  video plays makes Chrome re-sync visibly (stutter). After a dropout the engine skips ahead instead.
+- **Test audio changes inside the app bundle** (`--selftest`, `--sync-run`); a plain CLI receives silence.
+- The app must restore the user's real speakers whenever it stops (off, quit, SIGTERM, relaunch). Keep that.
+- Apple silicon only; macOS 14.2+.

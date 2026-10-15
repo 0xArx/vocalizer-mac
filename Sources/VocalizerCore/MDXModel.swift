@@ -15,13 +15,28 @@ public final class MDXModel {
     /// `url` may be an .mlpackage (compiled on the fly) or an already compiled .mlmodelc.
     public init(url: URL, frames: Int, computeUnits: MLComputeUnits = .all) throws {
         self.frames = frames
-        let compiled = url.pathExtension == "mlmodelc" ? url : try MLModel.compileModel(at: url)
+        let compiled = url.pathExtension == "mlmodelc" ? url : try MDXModel.cachedCompile(url)
         let config = MLModelConfiguration()
         config.computeUnits = computeUnits
         model = try MLModel(contentsOf: compiled, configuration: config)
         input = try MLMultiArray(shape: [1, 4, NSNumber(value: MDX.dimF), NSNumber(value: frames)], dataType: .float32)
         inputPointer = input.dataPointer.bindMemory(to: Float.self, capacity: input.count)
         provider = try MLDictionaryFeatureProvider(dictionary: ["input": MLFeatureValue(multiArray: input)])
+    }
+
+    /// Compiles an .mlpackage once into ~/Library/Application Support/Vocalizer (keyed by size and date).
+    static func cachedCompile(_ url: URL) throws -> URL {
+        let fm = FileManager.default
+        let attrs = try? fm.attributesOfItem(atPath: url.appendingPathComponent("Manifest.json").path)
+        let stamp = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        let dir = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Vocalizer")
+        let dest = dir.appendingPathComponent("\(url.deletingPathExtension().lastPathComponent)-\(Int(stamp)).mlmodelc")
+        if fm.fileExists(atPath: dest.path) { return dest }
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let tmp = try MLModel.compileModel(at: url)
+        try? fm.removeItem(at: dest)
+        try fm.moveItem(at: tmp, to: dest)
+        return dest
     }
 
     /// Runs the model on `input` and hands the (possibly strided) output to `body`.
