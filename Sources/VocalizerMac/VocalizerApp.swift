@@ -69,6 +69,19 @@ struct MenuView: View {
             .labelsHidden()
             Text(model.mode.hint + String(format: " · about %.1f s delay", model.mode.expectedDelayMs(sync: model.syncActive) / 1000))
                 .font(.caption).foregroundStyle(.secondary)
+            if model.mode == .supreme && !model.supremeReady {
+                if let p = model.supremeProgress {
+                    ProgressView(value: p) { Text("Downloading the Supreme model…").font(.caption) }
+                } else {
+                    HStack {
+                        Text("Supreme needs a one-time model download (about 410 MB).").font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Download") { model.downloadSupreme() }.controlSize(.small)
+                    }
+                }
+            } else if model.mode == .supreme && !model.syncActive {
+                Text("Tip: turn on Keep video in sync, so videos wait for the voice.").font(.caption).foregroundStyle(.orange)
+            }
 
             Divider()
             StatusView()
@@ -81,7 +94,7 @@ struct MenuView: View {
             }
         }
         .padding(14)
-        .frame(width: 330)
+        .frame(width: 370)
         .onAppear { model.refreshSources() }
     }
 }

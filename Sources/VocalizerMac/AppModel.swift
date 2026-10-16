@@ -5,14 +5,16 @@ import ServiceManagement
 import VocalizerCore
 
 enum Mode: String, CaseIterable, Identifiable {
-    case live, balanced, quality, ultra
+    case live, balanced, quality, supreme, ultra
     var id: String { rawValue }
-    var separation: VocalizerEngine.Separation {
+    /// nil for Supreme until its model is downloaded.
+    var separation: VocalizerEngine.Separation? {
         switch self {
         case .ultra: .deepFilter
         case .live: .mdx(.live)
         case .balanced: .mdx(.balanced)
         case .quality: .mdx(.quality)
+        case .supreme: SupremeModel.files().map { .roformer(model: $0.model, info: $0.info) }
         }
     }
     var title: String {
@@ -21,6 +23,7 @@ enum Mode: String, CaseIterable, Identifiable {
         case .live: "Live"
         case .balanced: "Balanced"
         case .quality: "Quality"
+        case .supreme: "Supreme"
         }
     }
     /// Algorithmic delay in ms (before buffering).
@@ -30,6 +33,7 @@ enum Mode: String, CaseIterable, Identifiable {
         case .live: SeparatorConfig.live.latencyMs
         case .balanced: SeparatorConfig.balanced.latencyMs
         case .quality: SeparatorConfig.quality.latencyMs
+        case .supreme: Double(1024 + RoformerConfig.supreme.rightContext + RoformerConfig.supreme.step) / 44.1
         }
     }
     var hint: String {
@@ -37,16 +41,18 @@ enum Mode: String, CaseIterable, Identifiable {
         case .ultra: "ultra fast, for talking only; removes singing too"
         case .live: "low delay, voices and singing"
         case .balanced: "a little cleaner"
-        case .quality: "best separation, for music apps"
+        case .quality: "clean, for music apps"
+        case .supreme: "best quality (MelBand RoFormer on the GPU)"
         }
     }
     /// Expected capture-to-speaker delay: model delay + safety buffer + ~35 ms of audio IO.
     func expectedDelayMs(sync: Bool) -> Double {
-        let buffer = sync ? syncJitterMs : (self == .quality ? 250 : self == .ultra ? 25 : 100)
+        let buffer = sync ? syncJitterMs : (self == .supreme ? 2700 : self == .quality ? 250 : self == .ultra ? 25 : 100)
         return latencyMs + buffer + 35
     }
     /// Extra buffering in sync mode, where the delay is hidden from video anyway.
-    var syncJitterMs: Double { self == .quality ? 300 : self == .ultra ? 80 : 200 }
+    /// (Supreme measures its own on load, ~2.7 s; this is the estimate shown before it runs.)
+    var syncJitterMs: Double { self == .supreme ? 2700 : self == .quality ? 300 : self == .ultra ? 80 : 200 }
 }
 
 @MainActor
@@ -71,7 +77,10 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var sourceID = AudioSource.all.id { didSet { if sourceID != oldValue, enabled { apply() } } }
-    @Published var mode: Mode = .live { didSet { if mode != oldValue, enabled { apply() } } }
+    @Published var mode: Mode = .live {
+        // Supreme without its model yet: keep playing in the previous mode until the download finishes.
+        didSet { if mode != oldValue, enabled, mode.separation != nil { apply() } }
+    }
     @Published var keepMusic = false { didSet { engine.stem = keepMusic ? .music : .vocals } }
     /// Route all audio through the Vocalizer virtual device, which reports our delay so video players
     /// hold the picture back by the same amount (lip sync).
@@ -83,6 +92,31 @@ final class AppModel: ObservableObject {
     }
     @Published private(set) var driverInstalled = AudioProcesses.vocalizerDevice() != nil
     @Published private(set) var reportedLatencyMs = 0.0
+    // MARK: Supreme model download
+
+    @Published private(set) var supremeReady = SupremeModel.files() != nil
+    @Published private(set) var supremeProgress: Double?
+
+    func downloadSupreme() {
+        guard supremeProgress == nil else { return }
+        supremeProgress = 0
+        error = nil
+        SupremeModel.download(progress: { [weak self] p in self?.supremeProgress = p }) { [weak self] err in
+            guard let self else { return }
+            self.supremeProgress = nil
+            if let err { self.error = "Supreme download: \(err.localizedDescription)"; return }
+            self.supremeReady = true
+            self.status = "Preparing Supreme…"
+            // Load + warm up on the GPU off the main thread, then (re)start in Supreme.
+            if let files = SupremeModel.files() {
+                Task.detached { [engine] in
+                    try? engine.preloadRoformer(model: files.model, info: files.info)
+                    await MainActor.run { if self.enabled && self.mode == .supreme { self.apply() } }
+                }
+            }
+        }
+    }
+
     /// Modes this build can run (Speech needs the optional DeepFilterNet library).
     let availableModes: [Mode] = Mode.allCases.filter { $0 != .ultra || AppModel.bundledDeepFilter() != nil }
     /// Engine starts since launch (diagnostics: should not climb while playing).
@@ -151,6 +185,7 @@ final class AppModel: ObservableObject {
         // If we quit or crashed while routing through the Vocalizer device, give the speakers back.
         restoreRealOutput()
         installSignalHandlers()
+        startWatchdog()
 
         // Volume keys / mute act on the Vocalizer device while routed: pass them on to the real speakers.
         for sel in [kAudioDevicePropertyVolumeScalar, kAudioDevicePropertyMute] {
@@ -264,6 +299,15 @@ final class AppModel: ObservableObject {
         currentOutputUID = uid
     }
 
+    /// A copy of ourselves that waits for this process to exit and restores the speakers if we could not.
+    private func startWatchdog() {
+        guard !CommandLine.arguments.contains(where: { $0.hasPrefix("--") }), let exe = Bundle.main.executableURL else { return }
+        let p = Process()
+        p.executableURL = exe
+        p.arguments = ["--watchdog", String(getpid())]
+        try? p.run()
+    }
+
     private func installSignalHandlers() {
         for sig in [SIGTERM, SIGINT, SIGHUP] {
             signal(sig, SIG_IGN)
@@ -375,12 +419,14 @@ final class AppModel: ObservableObject {
                 mirrorVolumeFromReal(real)
                 // Sync mode: latency is hidden from video, so buffer generously (no dropouts).
                 let wasRouted = (try? AudioProcesses.defaultOutputDevice()) == AudioProcesses.vocalizerDevice()
-                try engine.start(source: .virtualDevice, separation: mode.separation,
+                guard let separation = mode.separation else { throw CAError(-1, "Download the Supreme model first") }
+                try engine.start(source: .virtualDevice, separation: separation,
                                  jitterMs: mode.syncJitterMs, outputDevice: real, fixedDelay: true)
                 reportLatency(bounce: wasRouted)
             } else {
                 restoreRealOutput()
-                try engine.start(source: source, separation: mode.separation)
+                guard let separation = mode.separation else { throw CAError(-1, "Download the Supreme model first") }
+                try engine.start(source: source, separation: separation)
             }
             lastHeard = Date()
             starts += 1

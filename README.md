@@ -48,7 +48,8 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 |---|---|---|
 | **Live** (default) | about 0.4 s | videos, music with singing |
 | **Balanced** | about 0.5 s | a little cleaner |
-| **Quality** | about 1.9 s | music apps (cleanest) |
+| **Quality** | about 1.9 s | music apps |
+| **Supreme** | about 7 s | the cleanest vocals, for watching with sync on (one-time 400 MB download) |
 | **Speech** | about 0.15 s | talks, vlogs, calls. Also removes singing |
 
 - **Keep video in sync** (on by default): all sound goes through the *Vocalizer* audio device, which tells video
@@ -63,7 +64,9 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 
 ## Privacy
 
-Everything runs locally. Audio is never recorded to disk or sent anywhere. The app has no network code.
+Everything runs locally. Audio is never recorded to disk or sent anywhere. The only network request the app
+ever makes is the one-time download of the Supreme model from this repo's GitHub release, when you click
+**Download** in Supreme mode.
 
 ## How it works
 
@@ -165,6 +168,27 @@ permission is needed) and plays the vocals on the real output through the same a
 - Apps read the latency when they open the device, so a mode change briefly switches the default output away and
   back to make them re-read it (one re-sync). If a video still looks off after switching modes, pause and play it.
 
+### Supreme mode (MelBand RoFormer)
+
+A transformer separator (MelBand RoFormer vocals by Kimberley Jensen, MIT) converted to Core ML with
+`tools/convert_roformer.py` (network only; STFT, mask averaging over overlapping mel bands and iSTFT run in
+`RoformerSeparator.swift`). It runs on the GPU: about 1.6 s per 8 s window (the Neural Engine is 3x slower for this
+model, and 8-bit weights are 8x slower, so it ships as fp16, 403 MB, downloaded on first use from the `models-v1`
+release). Every 3 s it separates the latest 8 s window with 1.5 s of future context; the playback buffer covers a
+whole model call, so the delay is about 7 s, which video sync hides.
+
+Same 60 s of MUSDB18 songs, SDR against the true vocals:
+
+| | SDR | median per song |
+|---|---|---|
+| MDX-Net Quality (Core ML) | 10.56 dB | 11.08 dB |
+| BS-RoFormer viperx 1296 (PyTorch reference, not shipped: 3x heavier, unclear license) | 11.61 dB | 12.64 dB |
+| MelBand RoFormer reference (audio-separator, PyTorch) | 11.11 dB | 12.35 dB |
+| **Supreme** (our streaming Core ML version) | **11.69 dB** | **13.25 dB** |
+
+Real system path (loopback, sync on): measured delay 7.13 s vs 7.12 s estimated, **12.35 dB**, 0 underruns,
+GPU busy about 57 % of the time.
+
 ### Speech mode (DeepFilterNet3)
 
 A speech enhancement model (github.com/Rikorose/DeepFilterNet, MIT/Apache-2.0) that treats music as noise:
@@ -191,7 +215,7 @@ Tested on this Mac (MacBook Air, USB speakers + built-in speakers):
 | Volume keys / mute, sync on | ✅ passed through to the real speakers (software gain if they have no volume control) |
 | Switching speakers while playing | ✅ follows (USB ↔ built-in), no dropouts |
 | Speakers unplugged | moves to the next output (logic tested by switching; not physically unplugged) |
-| Force quit / crash | ✅ speakers restored as the default output (signal handler + check at launch) |
+| Force quit / crash | ✅ speakers restored as the default output: signal handler, a watchdog process for `kill -9` / crashes (tested), and a check at launch |
 | Mono or multichannel outputs | uses the device's preferred stereo pair, mono gets (L+R)/2 (stereo verified; others by code) |
 | Sleep / wake | restarts the pipeline on wake (not tested here) |
 
@@ -268,6 +292,8 @@ open -W -n build/Vocalizer.app --args --selftest app:com.apple.Music 12 live $PW
 - **Audio device (`Driver/`):** based on [BlackHole](https://github.com/ExistentialAudio/BlackHole) by Existential
   Audio, **GPL-3.0** ([Driver/LICENSE-BlackHole](Driver/LICENSE-BlackHole)). The full source of the modified driver
   is in `Driver/`.
+- **Supreme model:** [MelBand RoFormer vocals](https://huggingface.co/KimberleyJSN/melbandroformer) by
+  Kimberley Jensen (MIT), architecture by lucidrains / ZFTurbo, converted to Core ML here.
 - **Vocal model:** UVR MDX-Net vocals by the [Ultimate Vocal Remover](https://github.com/Anjok07/ultimatevocalremovergui)
   team (MIT, credit requested), converted to Core ML here. MDX-Net architecture by KUIELab.
 - **Speech mode:** [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) by Hendrik Schröter (MIT / Apache-2.0).

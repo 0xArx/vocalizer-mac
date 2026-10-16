@@ -26,6 +26,40 @@ if let i = args.firstIndex(of: "--selftest"), args.count >= i + 5 {
         exit(1)
     }
 }
+if let i = args.firstIndex(of: "--watchdog"), args.count > i + 1, let parent = pid_t(args[i + 1]) {
+    // Safety net started by the app: if it dies without cleaning up (crash, kill -9) while macOS still
+    // plays to the Vocalizer device, give the speakers back. Survives `pkill Vocalizer` on purpose.
+    for sig in [SIGTERM, SIGINT, SIGHUP] { signal(sig, SIG_IGN) }
+    func restore() -> Never {
+        usleep(500_000) // let a normal quit restore first
+        if let v = AudioProcesses.vocalizerDevice(), (try? AudioProcesses.defaultOutputDevice()) == v {
+            let saved = UserDefaults.standard.string(forKey: "realOutputUID").flatMap { AudioProcesses.device(uid: $0) }
+            let outputs = AudioProcesses.realOutputs()
+            if let real = saved ?? (outputs.first { $0.uid.contains("BuiltIn") } ?? outputs.first)?.id {
+                try? AudioProcesses.setDefaultOutput(real)
+            }
+        }
+        AudioProcesses.setVocalizerName("Vocalizer")
+        exit(0)
+    }
+    if kill(parent, 0) != 0 { restore() }
+    let src = DispatchSource.makeProcessSource(identifier: parent, eventMask: .exit, queue: .main)
+    src.setEventHandler { restore() }
+    src.resume()
+    dispatchMain()
+}
+if args.contains("--download-supreme") {
+    // Diagnostics: the same download the menu's button does.
+    let t0 = Date()
+    var last = -1
+    SupremeModel.download(progress: { p in
+        let pct = Int(p * 100); if pct / 10 != last / 10 { print("download \(pct)%"); last = pct }
+    }) { err in
+        print(err.map { "failed: \($0.localizedDescription)" } ?? String(format: "done in %.0f s -> %@", Date().timeIntervalSince(t0), SupremeModel.directory.path))
+        exit(err == nil ? 0 : 1)
+    }
+    RunLoop.main.run()
+}
 if args.contains("--list") {
     for s in AudioProcesses.list() { print("\(s.isPlaying ? "♪" : " ") \(s.name) [\(s.id)] pids \(s.pids)") }
     exit(0)

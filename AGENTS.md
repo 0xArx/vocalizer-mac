@@ -43,6 +43,8 @@ Options (pass after `bash -s --`, e.g. `curl ... | bash -s -- --no-driver`):
    *System Audio Recording*. They must click **Allow**. If they missed it: System Settings › Privacy & Security ›
    Screen & System Audio Recording › turn on **Vocalizer**.
 3. **Switch it on.** Click the microphone icon in the menu bar and flip the switch. Mode **Live** is the default.
+   **Supreme** (best quality, ~7 s delay hidden by video sync) needs a one-time 400 MB download: the user clicks
+   **Download** in the menu, or run `/Applications/Vocalizer.app/Contents/MacOS/Vocalizer --download-supreme`.
 
 ### 4. Verify (optional)
 
@@ -97,6 +99,7 @@ Layout:
 | `Sources/VocalizerCore/StreamingSeparator.swift` | sliding-window MDX separation, presets (live / balanced / quality) |
 | `Sources/VocalizerCore/MDXSpectrogram.swift`, `MDXModel.swift` | STFT/iSTFT matching UVR, Core ML wrapper |
 | `Sources/VocalizerCore/DeepFilterSeparator.swift` | Speech mode (DeepFilterNet3 via `libdf.dylib`, loaded at runtime) |
+| `Sources/VocalizerCore/RoformerSeparator.swift`, `SupremeModel.swift` | Supreme mode (MelBand RoFormer on the GPU) and its on-demand download (`models-v1` release) |
 | `Sources/VocalizerCore/AudioProcesses.swift` | process list, devices, volume, the Vocalizer device's `'vlat'` latency property |
 | `Sources/VocalizerMac/` | SwiftUI menu bar app; `main.swift` also has `--selftest`, `--sync-run`, `--snapshot`, `--list` |
 | `Driver/` | `BlackHole.c` (GPL-3.0) + `patch.py` that turns it into the Vocalizer device |
@@ -110,4 +113,6 @@ Rules that matter:
   video plays makes Chrome re-sync visibly (stutter). After a dropout the engine skips ahead instead.
 - **Test audio changes inside the app bundle** (`--selftest`, `--sync-run`); a plain CLI receives silence.
 - The app must restore the user's real speakers whenever it stops (off, quit, SIGTERM, relaunch). Keep that.
+- Supreme's playback buffer must cover a whole model call (`recommendedJitterMs`), or every step underruns.
+- A `--watchdog` child process restores the speakers if the app dies hard; keep it ignoring SIGTERM.
 - Apple silicon only; macOS 14.2+.

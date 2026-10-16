@@ -78,7 +78,15 @@ public final class VocalizerEngine {
 
     private let deepFilterFiles: (library: URL, model: URL)?
 
-    public enum Separation { case mdx(SeparatorConfig), deepFilter }
+    public enum Separation { case mdx(SeparatorConfig), deepFilter, roformer(model: URL, info: URL) }
+    private var roformer: (url: URL, sep: RoformerSeparator)?
+
+    /// Loads (and warms up) the Supreme model ahead of time; the engine reuses it.
+    public func preloadRoformer(model: URL, info: URL) throws {
+        modelLock.lock(); defer { modelLock.unlock() }
+        if roformer?.url == model { return }
+        roformer = (model, try RoformerSeparator(modelURL: model, infoURL: info))
+    }
 
     /// `modelURLs[frames]` points at MDXVocals<frames>.mlmodelc (or .mlpackage); `deepFilter` at
     /// libdf.dylib and DeepFilterNet3_onnx.tar.gz for the ultra-fast mode.
@@ -126,6 +134,13 @@ public final class VocalizerEngine {
             guard let df = deepFilterFiles else { throw CAError(-1, "DeepFilterNet library not bundled") }
             sep = try DeepFilterSeparator(library: df.library, model: df.model)
             defaultJitter = 25
+        case .roformer(let model, let info):
+            try preloadRoformer(model: model, info: info)
+            let r = roformer!.sep
+            r.reset()
+            sep = r
+            // A GPU call takes ~1.7 s of every 3 s step: the buffer must cover a whole call (with margin).
+            defaultJitter = r.recommendedJitterMs
         }
         let ioBufferFrames: UInt32? = { if case .deepFilter = separation { return 256 } else { return nil } }()
         sep.stem = stem
@@ -211,7 +226,7 @@ public final class VocalizerEngine {
         }
 
         // 3. Rings and priming: playback starts `step + jitter` behind the separated stream.
-        let jitter = jitterMs ?? defaultJitter
+        let jitter = max(jitterMs ?? defaultJitter, defaultJitter > 1000 ? defaultJitter : 0)
         let stepDev = Double(sep.step) * rate / sep.sampleRate
         let prime = Int(stepDev + jitter / 1000 * rate + Double(bufferFrames))
         primeFrames = prime

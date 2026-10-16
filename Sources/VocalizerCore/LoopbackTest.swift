@@ -16,7 +16,11 @@ public enum LoopbackTest {
         let sync = mode.hasPrefix("sync-")
         let base = sync ? String(mode.dropFirst(5)) : mode
         let config: SeparatorConfig = ["live": .live, "balanced": .balanced, "quality": .quality][base] ?? .live
-        let separation: VocalizerEngine.Separation = base == "ultra" ? .deepFilter : .mdx(config)
+        var separation: VocalizerEngine.Separation = base == "ultra" ? .deepFilter : .mdx(config)
+        if base == "supreme" {
+            guard let f = SupremeModel.files() else { throw LoopbackError(message: "Supreme model not downloaded") }
+            separation = .roformer(model: f.model, info: f.info)
+        }
         var realOutput: AudioDeviceID?
         if sync {
             guard let v = AudioProcesses.vocalizerDevice() else { throw LoopbackError(message: "Vocalizer device not installed") }
@@ -107,7 +111,7 @@ public enum LoopbackTest {
         guard err == noErr else { log("recorder ioproc failed \(err)"); throw LoopbackError(message: "failed") }
 
         if sync {
-            try engine.start(source: .virtualDevice, separation: separation, jitterMs: base == "quality" ? 300 : base == "ultra" ? 80 : 200, outputDevice: realOutput)
+            try engine.start(source: .virtualDevice, separation: separation, jitterMs: base == "supreme" ? 700 : base == "quality" ? 300 : base == "ultra" ? 80 : 200, outputDevice: realOutput)
             let ms = engine.stats.totalLatencyMs
             try AudioProcesses.setVocalizerLatency(frames: Int(ms / 1000 * 48_000))
             if let v = AudioProcesses.vocalizerDevice() {
@@ -119,7 +123,7 @@ public enum LoopbackTest {
         err = AudioDeviceStart(recAgg, recProc)
         guard err == noErr else { log("recorder start failed \(err)"); throw LoopbackError(message: "failed") }
         let rate = engine.stats.sampleRate
-        log("engine running at \(rate) Hz on \(engine.stats.outputDevice), mode \(mode): \(base == "ultra" ? "DeepFilterNet3" : config.description)")
+        log("engine running at \(rate) Hz on \(engine.stats.outputDevice), mode \(mode): \(base == "ultra" ? "DeepFilterNet3" : base == "supreme" ? "MelBand RoFormer" : config.description)")
 
         let t0 = Date()
         while Date().timeIntervalSince(t0) < seconds {

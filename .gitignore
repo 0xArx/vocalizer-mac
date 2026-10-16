@@ -6,3 +6,4 @@ fixtures/
 *.mlmodelc
 Driver/VocalizerDriver.c
 .DS_Store
+Models/MelRoformerVocals*

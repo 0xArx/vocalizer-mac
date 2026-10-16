@@ -155,3 +155,41 @@ if let lib = ProcessInfo.processInfo.environment["DF_LIB"], let mdl = ProcessInf
                  "ULTRA FAST (DeepFilterNet3)" as NSString, Double(best.lag) / 44.1, sdr(estL, estR, from: 44_100, to: n - 44_100),
                  compute / Double(n / 441) * 1000, worst * 1000, rtf, 1 / rtf, median as NSString))
 }
+
+// Supreme mode (MelBand RoFormer), if ROFORMER points at MelRoformerVocals.mlmodelc (with its .json next to it).
+if let path = ProcessInfo.processInfo.environment["ROFORMER"] {
+    let url = URL(fileURLWithPath: path)
+    let info = url.deletingPathExtension().appendingPathExtension("json")
+    let t0 = CFAbsoluteTimeGetCurrent()
+    let sep = try! RoformerSeparator(modelURL: url, infoURL: info)
+    print(String(format: "  loaded RoFormer in %.1f s", CFAbsoluteTimeGetCurrent() - t0))
+    var outL: [Float] = [], outR: [Float] = []
+    var compute = 0.0, modelT = 0.0, steps = 0, worst = 0.0
+    let block = 4410
+    var pos = 0
+    let zeros = [Float](repeating: 0, count: block)
+    while outL.count < n + sep.streamDelay {
+        mixL.withUnsafeBufferPointer { l in mixR.withUnsafeBufferPointer { r in
+            if pos + block <= n { sep.push(left: l.baseAddress! + pos, right: r.baseAddress! + pos, count: block) }
+            else { zeros.withUnsafeBufferPointer { z in sep.push(left: z.baseAddress!, right: z.baseAddress!, count: block) } }
+        } }
+        pos += block
+        while try! sep.process(emit: { l, r, k in
+            outL.append(contentsOf: UnsafeBufferPointer(start: l, count: k))
+            outR.append(contentsOf: UnsafeBufferPointer(start: r, count: k))
+        }) { compute += sep.lastStepTime; modelT += sep.lastModelTime; steps += 1; worst = max(worst, sep.lastStepTime) }
+    }
+    let d = sep.streamDelay
+    let estL = Array(outL[d..<(d + n)]), estR = Array(outR[d..<(d + n)])
+    var median = ""
+    if segments.first.map({ $0 <= n }) == true {
+        var start = 0, scores: [Double] = []
+        for len in segments where start + len <= n { scores.append(sdr(estL, estR, from: start, to: start + len)); start += len }
+        median = String(format: " | median %.2f dB", scores.sorted()[scores.count / 2])
+    }
+    let rtf = compute / (Double(pos) / 44_100)
+    print(String(format: "%-31@ | %4.0f ms | %5.2f dB | %6.1f (%6.1f) max %6.1f | %.3f (%.1fx real time)%@",
+                 "SUPREME (MelBand RoFormer)" as NSString, Double(sep.streamDelay + sep.step) / 44.1,
+                 sdr(estL, estR, from: 44_100, to: n - 44_100), compute / Double(steps) * 1000, modelT / Double(steps) * 1000,
+                 worst * 1000, rtf, 1 / rtf, median as NSString))
+}

@@ -26,7 +26,9 @@ def offset(rec, ref, seg=44100 * 4, start=44100 * 2):
     return int(np.argmax(c)) - start
 
 offA = offset(orig, mix)
-offB = offset(out, voc, start=44100 * 3)
+# Align the output on a stretch where it is already playing (Supreme starts ~7 s in).
+nz0 = np.flatnonzero(np.abs(out).max(1) > 1e-3)
+offB = offset(out, voc, start=max(44100 * 3, int(nz0[0]) + 44100 if len(nz0) else 0))
 delay = offA - offB
 print(f"rate {rate} Hz, mode {meta['mode']}, recorded {len(orig) / 44100:.1f} s")
 print(f"measured delay (tap in -> our output): {delay} samples = {delay / 44.1:.1f} ms "
@@ -42,6 +44,8 @@ def si_sdr(ref, est):
 
 print(f"alignment: recording starts at source sample {offA}, output at {offB}")
 lo = max(44100 * 2, -offB + 44100)  # skip warm-up and the initial silence
+nz = np.flatnonzero(np.abs(out).max(1) > 1e-3)
+if len(nz): lo = max(lo, int(nz[0]) + 44100)  # output starts only after the pipeline delay
 hi = min(len(out), len(voc) - offB) - 44100
 est = out[lo:hi]
 ref = voc[lo + offB:hi + offB]
