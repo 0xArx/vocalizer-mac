@@ -86,8 +86,18 @@ struct MenuView: View {
             Divider()
             StatusView()
 
+            if model.updater.updateAvailable, let v = model.updater.latest {
+                HStack {
+                    Label("Vocalizer \(v) is available", systemImage: "arrow.down.circle").font(.caption)
+                    Spacer()
+                    Button(model.updater.updating ? "Updating…" : "Update") { model.updater.update() }
+                        .controlSize(.small).disabled(model.updater.updating)
+                }
+            }
             HStack {
                 Toggle("Open at login", isOn: $model.openAtLogin).controlSize(.small)
+                Spacer()
+                Text("v\(model.updater.current) · ⌥⇧V toggles").font(.caption2).foregroundStyle(.tertiary)
                 Spacer()
                 // Quitting keeps "on" remembered, so it resumes next launch.
                 Button("Quit") { NSApp.terminate(nil) }

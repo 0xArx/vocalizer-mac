@@ -61,10 +61,12 @@ final class AppModel: ObservableObject {
         didSet {
             if enabled != oldValue { apply() }
             // Remember it, so it comes back on after a restart (with Open at login).
-            if !restoring { UserDefaults.standard.set(enabled, forKey: "wasOn") }
+            if !restoring && !AppModel.testing { UserDefaults.standard.set(enabled, forKey: "wasOn") }
         }
     }
     private var restoring = false
+    /// Diagnostic runs (--selftest, --snapshot, ...) must not change the user's saved settings.
+    nonisolated static let testing = CommandLine.arguments.contains { $0.hasPrefix("--") }
     @Published var openAtLogin = SMAppService.mainApp.status == .enabled {
         didSet {
             guard openAtLogin != oldValue else { return }
@@ -86,7 +88,7 @@ final class AppModel: ObservableObject {
     /// hold the picture back by the same amount (lip sync).
     @Published var syncVideo = UserDefaults.standard.object(forKey: "syncVideo") as? Bool ?? true {
         didSet {
-            UserDefaults.standard.set(syncVideo, forKey: "syncVideo")
+            if !AppModel.testing { UserDefaults.standard.set(syncVideo, forKey: "syncVideo") }
             if syncVideo != oldValue, enabled { apply() }
         }
     }
@@ -159,8 +161,7 @@ final class AppModel: ObservableObject {
                     self.ready = true
                     self.status = "Ready"
                     // Resume where the user left off (not in the test modes, which drive `enabled` themselves).
-                    let testing = CommandLine.arguments.contains { $0.hasPrefix("--") }
-                    if !testing && UserDefaults.standard.bool(forKey: "wasOn") {
+                    if !AppModel.testing && UserDefaults.standard.bool(forKey: "wasOn") {
                         self.restoring = true
                         self.enabled = true
                         self.restoring = false
@@ -183,9 +184,19 @@ final class AppModel: ObservableObject {
         AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, .main, block)
 
         // If we quit or crashed while routing through the Vocalizer device, give the speakers back.
-        restoreRealOutput()
+        // (Not in diagnostic runs: the real app may be running and routing right now.)
+        if !AppModel.testing { restoreRealOutput() }
         installSignalHandlers()
         startWatchdog()
+        if !AppModel.testing {
+            hotKey = HotKey { [weak self] in
+                guard let self, self.ready else { return }
+                self.enabled.toggle()
+            }
+            updaterSink = updater.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
+            updater.checkSoon()
+            DispatchQueue.main.async { WelcomeWindow.showIfFirstLaunch(model: self) }
+        }
 
         // Volume keys / mute act on the Vocalizer device while routed: pass them on to the real speakers.
         for sel in [kAudioDevicePropertyVolumeScalar, kAudioDevicePropertyMute] {
@@ -214,6 +225,9 @@ final class AppModel: ObservableObject {
     }
 
     private var listeners: [AudioObjectPropertyListenerBlock] = []
+    private var hotKey: HotKey?
+    let updater = Updater()
+    private var updaterSink: AnyCancellable?
     private var activeRealUID: String?
 
     // MARK: volume pass-through (sync mode)

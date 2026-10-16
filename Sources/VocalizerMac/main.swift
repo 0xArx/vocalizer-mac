@@ -60,6 +60,32 @@ if args.contains("--download-supreme") {
     }
     RunLoop.main.run()
 }
+if let i = args.firstIndex(of: "--snapshot-welcome"), args.count > i + 1 {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    MainActor.assumeIsolated {
+        let model = AppModel()
+        let host = NSHostingView(rootView: WelcomeView(model: model) {})
+        host.frame = NSRect(x: 0, y: 0, width: 460, height: 400)
+        let win = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        win.contentView = host
+        win.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
+        win.orderFrontRegardless()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                host.cacheDisplay(in: host.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: args[i + 1]))
+            }
+            exit(0)
+        }
+    }
+    app.run()
+}
+if args.contains("--hotkey-check") {
+    let key = HotKey {}
+    print("Option-Shift-V: handler \(key.status.handler), registration \(key.status.key) (0 = ok)")
+    exit(key.status.handler == 0 && key.status.key == 0 ? 0 : 1)
+}
 if args.contains("--list") {
     for s in AudioProcesses.list() { print("\(s.isPlaying ? "♪" : " ") \(s.name) [\(s.id)] pids \(s.pids)") }
     exit(0)

@@ -59,14 +59,18 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
   Control Center shows **Vocalizer (your headphones)** so you can see where the sound really goes, and the
   **Output** picker in the Vocalizer menu switches it directly.
 - With sync off, you can pick a single app to filter (Source).
+- **⌥⇧V** (Option-Shift-V) switches it on or off from anywhere.
 - **Open at login** is in the menu; Vocalizer remembers whether it was on.
+- When a new version is out, the menu shows **Update**: one click runs the installer and reopens the app.
 - Things that can't wait (games, live calls) still hear the delay. Use Speech mode for calls.
+- Video sync is verified for long delays too: with Supreme's ~7.2 s, Chrome held the picture for 7.1 s and Apple's
+  player (Safari, QuickTime, TV) for 7.4 s before playing, then played smoothly.
 
 ## Privacy
 
-Everything runs locally. Audio is never recorded to disk or sent anywhere. The only network request the app
-ever makes is the one-time download of the Supreme model from this repo's GitHub release, when you click
-**Download** in Supreme mode.
+Everything runs locally. Audio is never recorded to disk or sent anywhere. The app makes only two kinds of
+network requests, both to GitHub: a version check once a day (the latest release number), and the one-time
+download of the Supreme model when you click **Download** in Supreme mode.
 
 ## How it works
 
@@ -215,6 +219,7 @@ Tested on this Mac (MacBook Air, USB speakers + built-in speakers):
 | Volume keys / mute, sync on | ✅ passed through to the real speakers (software gain if they have no volume control) |
 | Switching speakers while playing | ✅ follows (USB ↔ built-in), no dropouts |
 | Speakers unplugged | moves to the next output (logic tested by switching; not physically unplugged) |
+| Supreme (~7.2 s) video sync | ✅ Chrome `outputLatency` 7208 ms, picture waits 7.1 s; AVPlayer waits 7.4 s (0.25 s on plain speakers) |
 | Force quit / crash | ✅ speakers restored as the default output: signal handler, a watchdog process for `kill -9` / crashes (tested), and a check at launch |
 | Mono or multichannel outputs | uses the device's preferred stereo pair, mono gets (L+R)/2 (stereo verified; others by code) |
 | Sleep / wake | restarts the pipeline on wake (not tested here) |
