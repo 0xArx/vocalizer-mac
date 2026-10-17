@@ -42,9 +42,10 @@ Options (pass after `bash -s --`, e.g. `curl ... | bash -s -- --no-driver`):
 2. **System Audio Recording permission.** The first time they switch Vocalizer on, macOS asks to allow
    *System Audio Recording*. They must click **Allow**. If they missed it: System Settings › Privacy & Security ›
    Screen & System Audio Recording › turn on **Vocalizer**.
-3. **Switch it on.** Click the microphone icon in the menu bar and flip the switch. Mode **Live** is the default.
-   **Supreme** (best quality, ~7 s delay hidden by video sync) needs a one-time 400 MB download: the user clicks
-   **Download** in the menu, or run `/Applications/Vocalizer.app/Contents/MacOS/Vocalizer --download-supreme`.
+3. **Switch it on.** Click the microphone icon in the menu bar and flip the switch. Mode **Fast** is the default
+   (modes in the menu: Fast, Clean, Best, Speech = `live`, `quality`, `supreme`, `ultra` in code).
+   **Best** (~7 s delay hidden by video sync) needs a one-time 400 MB download: the user clicks **Download** in the
+   menu, or run `/Applications/Vocalizer.app/Contents/MacOS/Vocalizer --download-supreme`.
 
 ### 4. Verify (optional)
 

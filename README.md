@@ -46,12 +46,16 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 
 | Mode | Delay (sync on) | Best for |
 |---|---|---|
-| **Live** (default) | about 0.4 s | videos, music with singing |
-| **Balanced** | about 0.5 s | a little cleaner |
-| **Quality** | about 1.9 s | music apps |
-| **Supreme** | about 7 s | the cleanest vocals, for watching with sync on (one-time 400 MB download) |
+| **Fast** (default) | about 0.4 s | everyday videos, music with singing |
+| **Clean** | about 2 s | music apps, cleaner voices |
+| **Best** | about 7 s | the cleanest voices, with video sync on (one-time 400 MB download) |
 | **Speech** | about 0.15 s | talks, vlogs, calls. Also removes singing |
 
+(In the code and the measurements below these are `live`, `quality`, `supreme` and `ultra`; `balanced` still exists
+but is no longer offered in the menu.)
+
+- **Settings** (folded away in the menu): **Keep video in sync**, **Open at login**, and with sync off, which app
+  to filter. Everything else is the switch, the mode and where it plays.
 - **Keep video in sync** (on by default): all sound goes through the *Vocalizer* audio device, which tells video
   players the delay, so the picture waits for the voice. Your speakers or headphones stay the real output, the volume
   keys keep working, and your speakers come back when you switch it off or quit.

@@ -20,10 +20,19 @@ enum Mode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .ultra: "Speech"
-        case .live: "Live"
+        case .live: "Fast"
         case .balanced: "Balanced"
-        case .quality: "Quality"
-        case .supreme: "Supreme"
+        case .quality: "Clean"
+        case .supreme: "Best"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .ultra: "person.wave.2.fill"
+        case .live: "bolt.fill"
+        case .balanced: "slider.horizontal.3"
+        case .quality: "sparkles"
+        case .supreme: "wand.and.stars"
         }
     }
     /// Algorithmic delay in ms (before buffering).
@@ -36,13 +45,14 @@ enum Mode: String, CaseIterable, Identifiable {
         case .supreme: Double(1024 + RoformerConfig.supreme.rightContext + RoformerConfig.supreme.step) / 44.1
         }
     }
-    var hint: String {
+    func hint(delaySeconds d: Double) -> String {
+        let delay = d < 1 ? String(format: "%.1f s", d) : String(format: "%.0f s", d.rounded())
         switch self {
-        case .ultra: "ultra fast, for talking only; removes singing too"
-        case .live: "low delay, voices and singing"
-        case .balanced: "a little cleaner"
-        case .quality: "clean, for music apps"
-        case .supreme: "best quality (MelBand RoFormer on the GPU)"
+        case .ultra: return "For talks and calls. Also removes singing. \(delay) behind."
+        case .live: return "For everyday videos. \(delay) behind."
+        case .balanced: return "A little cleaner than Fast. \(delay) behind."
+        case .quality: return "Cleaner voices, for music apps. \(delay) behind."
+        case .supreme: return "The cleanest voices. \(delay) behind, videos wait for it."
         }
     }
     /// Expected capture-to-speaker delay: model delay + safety buffer + ~35 ms of audio IO.
@@ -120,7 +130,8 @@ final class AppModel: ObservableObject {
     }
 
     /// Modes this build can run (Speech needs the optional DeepFilterNet library).
-    let availableModes: [Mode] = Mode.allCases.filter { $0 != .ultra || AppModel.bundledDeepFilter() != nil }
+    /// (Balanced is kept for saved settings but not offered: it was barely different from Fast.)
+    let availableModes: [Mode] = Mode.allCases.filter { $0 != .balanced && ($0 != .ultra || AppModel.bundledDeepFilter() != nil) }
     /// Engine starts since launch (diagnostics: should not climb while playing).
     private(set) var starts = 0
     var syncActive: Bool { syncVideo && driverInstalled }
