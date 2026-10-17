@@ -93,9 +93,14 @@ struct MenuView: View {
     @ViewBuilder private var notices: some View {
         if let e = model.error {
             notice("exclamationmark.triangle.fill", .orange, e, nil, nil)
-        } else if on && model.silentFor > 4 && model.sources.contains(where: \.isPlaying) {
-            // Something is playing but nothing reaches us: almost always the recording permission.
-            notice("hand.raised.fill", .orange, "No sound is coming in. If something is playing, allow Vocalizer in System Settings › Privacy & Security › Screen & System Audio Recording.", nil, nil)
+        } else if model.enabled && model.audioPermission == .denied {
+            // macOS says we may not hear other apps: say so plainly and go straight to the setting.
+            notice("hand.raised.fill", .orange, "Vocalizer isn't allowed to hear other apps yet. Turn on Vocalizer under System Audio Recording.", "Open Settings") {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture")!)
+            }
+        } else if on && model.audioPermission == .unknown && model.silentFor > 8 && model.sources.contains(where: \.isPlaying) {
+            // Permission not decided yet (macOS asks on first use) and nothing arrives: point at the prompt.
+            notice("hand.raised.fill", .orange, "No sound yet. If macOS asked about System Audio Recording, click Allow.", nil, nil)
         } else if model.mode == .supreme && !model.supremeReady {
             if let p = model.supremeProgress {
                 VStack(alignment: .leading, spacing: 6) {

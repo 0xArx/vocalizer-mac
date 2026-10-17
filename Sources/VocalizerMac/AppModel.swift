@@ -141,6 +141,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var ready = false
     @Published private(set) var silentFor = 0.0
+    /// System Audio Recording permission as macOS reports it (checked every couple of seconds).
+    @Published private(set) var audioPermission: AudioPermission.State = AudioPermission.systemAudio
 
     let engine = VocalizerEngine(modelURLs: AppModel.bundledModels(), deepFilter: AppModel.bundledDeepFilter())
     private var timer: Timer?
@@ -583,7 +585,11 @@ final class AppModel: ObservableObject {
     private func tick() {
         // Keep the Source list current (apps that start or stop playing) without a refresh button.
         ticks += 1
-        if ticks % 4 == 0 { refreshSources() }
+        if ticks % 4 == 0 {
+            refreshSources()
+            let p = AudioPermission.systemAudio
+            if p != audioPermission { audioPermission = p }
+        }
         if !ready { return }
         if enabled && !engine.stats.running { apply() }
         stats = engine.stats
