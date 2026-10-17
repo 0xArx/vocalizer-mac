@@ -95,6 +95,17 @@ public final class VocalizerEngine {
         deepFilterFiles = deepFilter
     }
 
+    /// Drops the loaded models so the next start loads fresh ones. Called after the Mac wakes: Neural Engine
+    /// state from before sleep is what Core ML failed on in the field (output memory binding).
+    public func reloadModels() {
+        modelLock.lock()
+        models.removeAll()
+        let supreme = roformer.map { ($0.url, $0.sep) }
+        roformer = nil
+        modelLock.unlock()
+        _ = supreme // released here; reloaded on demand (Supreme takes ~3 s)
+    }
+
     /// Loads (and compiles for the Neural Engine) every model up front; takes a few seconds.
     public func preload() throws { for f in modelURLs.keys.sorted() { _ = try model(f) } }
 

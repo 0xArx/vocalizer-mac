@@ -214,7 +214,13 @@ final class AppModel: ObservableObject {
         AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &devicesAddr, .main, devicesBlock)
         // After sleep the audio hardware may have been reset.
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { if self?.enabled == true { self?.apply() } }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                // Fresh models after sleep (see VocalizerEngine.reloadModels), then restart if on.
+                self.engine.stop()
+                self.engine.reloadModels()
+                if self.enabled { self.apply() }
+            }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {

@@ -115,6 +115,12 @@ if let i = args.firstIndex(of: "--sync-run"), args.count >= i + 4 {
                                     Date().timeIntervalSince(t0!), s.outputDevice, dev, model.starts, model.reportedLatencyMs, s.totalLatencyMs,
                                     s.underruns, s.inputPeak, s.outputPeak, s.realTimeFactor, model.error ?? "-"))
                 try? lines.joined(separator: "\n").write(to: logURL, atomically: true, encoding: .utf8)
+                // VOCALIZER_TEST_WAKE=<s>: post the "Mac woke up" notification once, at that time.
+                if let w = ProcessInfo.processInfo.environment["VOCALIZER_TEST_WAKE"].flatMap(Double.init),
+                   Date().timeIntervalSince(t0!) >= w, !lines.contains(where: { $0.hasPrefix("simulated wake") }) {
+                    lines.append("simulated wake")
+                    NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: NSWorkspace.shared)
+                }
                 if Date().timeIntervalSince(t0!) > seconds {
                     model.enabled = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
