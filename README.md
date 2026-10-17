@@ -65,7 +65,9 @@ but is no longer offered in the menu.)
 - With sync off, you can pick a single app to filter (Source).
 - **⌥⇧V** (Option-Shift-V) switches it on or off from anywhere.
 - **Waiting is visible.** With Best (and Clean), videos hold their picture until the voice arrives: the menu shows
-  "Video starts in 6 s" with a progress bar, and the menu bar icon turns into an hourglass, after switching mode and
+  "Video starts in 6 s" with a progress bar, a countdown ring appears in the middle of the screen (like the volume
+  pop-up; click-through, works over full-screen video, can be turned off in Settings), and the menu bar icon turns
+  into an hourglass, after switching mode and
   each time sound starts again (a new video, play, or seeking). Best loads in the background with a spinner on its
   tile while the current mode keeps playing (it used to freeze the menu for ~6 s).
 - **Open at login** is in the menu; Vocalizer remembers whether it was on.

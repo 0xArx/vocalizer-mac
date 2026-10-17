@@ -445,6 +445,8 @@ final class AppModel: ObservableObject {
     /// Until when videos are holding their picture for our delay (after a switch, or when sound starts).
     @Published private(set) var catchUpUntil: Date?
     private var heardSoundAt: Date?, silentSince: Date?
+    private var catchUpStartedBySound: Date?
+    private let hud = CountdownHUD()
 
     var catchUpSeconds: Int? {
         guard let until = catchUpUntil else { return nil }
@@ -460,6 +462,12 @@ final class AppModel: ObservableObject {
         catchUpTotal = delay
     }
     private(set) var catchUpTotal = 1.0
+
+    /// Diagnostics (--snapshot-hud): pretend a video started `elapsed` s into a `total` s wait.
+    func debugCatchUp(total: Double, elapsed: Double) {
+        catchUpTotal = total
+        catchUpUntil = Date().addingTimeInterval(total - elapsed)
+    }
 
     /// 0...1 progress through the current wait, for the bar under the header.
     var catchUpProgress: Double? {
@@ -499,11 +507,21 @@ final class AppModel: ObservableObject {
         // delay, so count it down.
         // (Paused players send digital silence; real quiet passages stay above -80 dB.)
         if stats.running && stats.inputPeak > 1e-4 {
-            if let since = silentSince, Date().timeIntervalSince(since) > 1.0 { startCatchUp() }
+            if let since = silentSince, Date().timeIntervalSince(since) > 1.0 {
+                startCatchUp()
+                catchUpStartedBySound = Date()
+            }
             silentSince = nil
-        } else if silentSince == nil {
-            silentSince = Date()
+        } else {
+            if silentSince == nil { silentSince = Date() }
+            // A short blip (notification sound) is not a video starting: cancel its countdown.
+            if let started = catchUpStartedBySound, Date().timeIntervalSince(started) < 2.5,
+               let since = silentSince, Date().timeIntervalSince(since) > 0.6 {
+                catchUpUntil = nil
+                catchUpStartedBySound = nil
+            }
         }
+        if !AppModel.testing || ProcessInfo.processInfo.environment["VOCALIZER_TEST_HUD"] != nil { hud.update(model: self) }
             return
         }
         guard ready else { status = "Loading model…"; return }
@@ -573,11 +591,21 @@ final class AppModel: ObservableObject {
         // delay, so count it down.
         // (Paused players send digital silence; real quiet passages stay above -80 dB.)
         if stats.running && stats.inputPeak > 1e-4 {
-            if let since = silentSince, Date().timeIntervalSince(since) > 1.0 { startCatchUp() }
+            if let since = silentSince, Date().timeIntervalSince(since) > 1.0 {
+                startCatchUp()
+                catchUpStartedBySound = Date()
+            }
             silentSince = nil
-        } else if silentSince == nil {
-            silentSince = Date()
+        } else {
+            if silentSince == nil { silentSince = Date() }
+            // A short blip (notification sound) is not a video starting: cancel its countdown.
+            if let started = catchUpStartedBySound, Date().timeIntervalSince(started) < 2.5,
+               let since = silentSince, Date().timeIntervalSince(since) > 0.6 {
+                catchUpUntil = nil
+                catchUpStartedBySound = nil
+            }
         }
+        if !AppModel.testing || ProcessInfo.processInfo.environment["VOCALIZER_TEST_HUD"] != nil { hud.update(model: self) }
         if stats.running {
             if stats.inputPeak > 1e-4 { lastHeard = Date() }
             silentFor = Date().timeIntervalSince(lastHeard)

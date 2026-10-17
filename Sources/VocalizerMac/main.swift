@@ -81,6 +81,28 @@ if let i = args.firstIndex(of: "--snapshot-welcome"), args.count > i + 1 {
     }
     app.run()
 }
+if let i = args.firstIndex(of: "--snapshot-hud"), args.count > i + 1 {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    MainActor.assumeIsolated {
+        let model = AppModel()
+        model.debugCatchUp(total: 7.3, elapsed: 2.6)
+        let host = NSHostingView(rootView: CountdownView(model: model).padding(30).background(Color(white: 0.35)))
+        host.frame = NSRect(x: 0, y: 0, width: 250, height: 250)
+        let win = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        win.contentView = host
+        win.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
+        win.orderFrontRegardless()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                host.cacheDisplay(in: host.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: args[i + 1]))
+            }
+            exit(0)
+        }
+    }
+    app.run()
+}
 if args.contains("--hotkey-check") {
     let key = HotKey {}
     print("Option-Shift-V: handler \(key.status.handler), registration \(key.status.key) (0 = ok)")

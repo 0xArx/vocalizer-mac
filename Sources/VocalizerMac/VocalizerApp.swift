@@ -22,6 +22,7 @@ struct VocalizerApp: App {
 struct MenuView: View {
     @EnvironmentObject var model: AppModel
     @AppStorage("showSettings") private var showSettings = false
+    @AppStorage("screenCountdown") private var screenCountdown = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -197,6 +198,7 @@ struct MenuView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     settingToggle("Keep video in sync", "Videos wait for the voice, so lips always match.", $model.syncVideo)
                     settingToggle("Open at login", "Start Vocalizer when you log in.", $model.openAtLogin)
+                    settingToggle("Show countdown on screen", "While a video waits for the voice (Best, Clean).", $screenCountdown)
                     if !model.syncActive {
                         HStack {
                             Text("Only remove music from").font(.system(size: 12.5))
