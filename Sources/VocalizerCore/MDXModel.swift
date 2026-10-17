@@ -2,10 +2,18 @@
 
 import CoreML
 import Foundation
+import VocalizerObjC
 
 public final class MDXModel {
     public let frames: Int
-    private let model: MLModel
+    private var model: MLModel
+    private let compiledURL: URL
+    private let configuration: MLModelConfiguration
+    /// Preallocated output (passed as an output backing so Core ML never has to allocate one per call).
+    private let outputBacking: MLMultiArray?
+    /// Model calls that raised an exception and were recovered from (diagnostics).
+    public private(set) var failures = 0
+    public private(set) var usesOutputBacking = false
     /// Contiguous [1, 4, dimF, frames] input; write the spectrogram straight into `inputPointer`.
     public let input: MLMultiArray
     public let inputPointer: UnsafeMutablePointer<Float>
@@ -18,10 +26,30 @@ public final class MDXModel {
         let compiled = url.pathExtension == "mlmodelc" ? url : try MDXModel.cachedCompile(url)
         let config = MLModelConfiguration()
         config.computeUnits = computeUnits
+        compiledURL = compiled
+        configuration = config
         model = try MLModel(contentsOf: compiled, configuration: config)
         input = try MLMultiArray(shape: [1, 4, NSNumber(value: MDX.dimF), NSNumber(value: frames)], dataType: .float32)
         inputPointer = input.dataPointer.bindMemory(to: Float.self, capacity: input.count)
         provider = try MLDictionaryFeatureProvider(dictionary: ["input": MLFeatureValue(multiArray: input)])
+        outputBacking = try? MLMultiArray(shape: [1, 4, NSNumber(value: MDX.dimF), NSNumber(value: frames)], dataType: .float32)
+        if let outputBacking { options.outputBackings = ["output": outputBacking] }
+        // Check the backing is accepted; if Core ML rejects it, fall back to its own buffers.
+        if (try? predict()) == nil { options.outputBackings = [:] }
+        usesOutputBacking = !(options.outputBackings.isEmpty)
+    }
+
+    /// One prediction; Objective-C exceptions from Core ML become Swift errors, and the model is reloaded.
+    private func predict() throws -> MLFeatureProvider {
+        var error: NSError?
+        if let out = VCLPredict(model, provider, options, &error) { return out }
+        let err = error ?? NSError(domain: "MDXModel", code: 2, userInfo: [NSLocalizedDescriptionKey: "prediction failed"])
+        if err.domain == "VocalizerCoreMLException" {
+            failures += 1
+            NSLog("Vocalizer: Core ML exception (%@); reloading the model", err.localizedDescription)
+            if let fresh = try? MLModel(contentsOf: compiledURL, configuration: configuration) { model = fresh }
+        }
+        throw err
     }
 
     /// Compiles an .mlpackage once into ~/Library/Application Support/Vocalizer (keyed by size and date).
@@ -41,7 +69,7 @@ public final class MDXModel {
 
     /// Runs the model on `input` and hands the (possibly strided) output to `body`.
     public func run<T>(_ body: (SpecView) throws -> T) throws -> T {
-        let out = try model.prediction(from: provider, options: options)
+        let out = try predict()
         guard let arr = out.featureValue(for: "output")?.multiArrayValue else {
             throw NSError(domain: "MDXModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "model returned no output"])
         }

@@ -6,7 +6,8 @@ let package = Package(
     platforms: [.macOS("14.2")],
     targets: [
         .target(name: "CRing", path: "Sources/CRing"),
-        .target(name: "VocalizerCore", dependencies: ["CRing"], path: "Sources/VocalizerCore"),
+        .target(name: "VocalizerObjC", path: "Sources/VocalizerObjC"),
+        .target(name: "VocalizerCore", dependencies: ["CRing", "VocalizerObjC"], path: "Sources/VocalizerCore"),
         .executableTarget(name: "VocalizerMac", dependencies: ["VocalizerCore", "CRing"], path: "Sources/VocalizerMac"),
         .executableTarget(name: "vocalizer-bench", dependencies: ["VocalizerCore"], path: "Sources/vocalizer-bench"),
         .executableTarget(name: "vocalizer-tap-test", dependencies: ["VocalizerCore"], path: "Sources/vocalizer-tap-test"),

@@ -48,7 +48,7 @@ func model(_ frames: Int) -> MDXModel {
     if let m = models[frames] { return m }
     let t = CFAbsoluteTimeGetCurrent()
     let m = try! MDXModel(url: modelURL(frames), frames: frames, computeUnits: units)
-    print(String(format: "  loaded %d-frame model in %.2f s", frames, CFAbsoluteTimeGetCurrent() - t))
+    print(String(format: "  loaded %d-frame model in %.2f s, output backing %@", frames, CFAbsoluteTimeGetCurrent() - t, m.usesOutputBacking ? "yes" : "no"))
     models[frames] = m
     return m
 }

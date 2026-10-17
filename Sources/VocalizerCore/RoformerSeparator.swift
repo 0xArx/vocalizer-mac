@@ -8,6 +8,7 @@
 import Accelerate
 import CoreML
 import Foundation
+import VocalizerObjC
 
 public struct RoformerConfig {
     public var step: Int
@@ -38,7 +39,11 @@ public final class RoformerSeparator: Separating {
 
     private let config: RoformerConfig
     private let info: RoformerInfo
-    private let model: MLModel
+    private var model: MLModel
+    private let compiledURL: URL
+    private let modelConfig: MLModelConfiguration
+    /// Model calls that failed and were replaced by silence.
+    public private(set) var modelFailures = 0
     private let input: MLMultiArray
     private let inPtr: UnsafeMutablePointer<Float>
     private let provider: MLDictionaryFeatureProvider
@@ -65,6 +70,8 @@ public final class RoformerSeparator: Separating {
         let compiled = modelURL.pathExtension == "mlmodelc" ? modelURL : try MDXModel.cachedCompile(modelURL)
         let mc = MLModelConfiguration()
         mc.computeUnits = .cpuAndGPU // measured: GPU 1.6 s per 8 s chunk; the Neural Engine is 3x slower here
+        compiledURL = compiled
+        modelConfig = mc
         model = try MLModel(contentsOf: compiled, configuration: mc)
         input = try MLMultiArray(shape: [1, NSNumber(value: bins * 2), NSNumber(value: frames), 2], dataType: .float32)
         inPtr = input.dataPointer.bindMemory(to: Float.self, capacity: input.count)
@@ -130,7 +137,15 @@ public final class RoformerSeparator: Separating {
 
         analyze()
         let t1 = CFAbsoluteTimeGetCurrent()
-        try runModel()
+        do {
+            try runModel()
+        } catch {
+            // Rare Core ML failure: silence for this step (keeps timing), reload the model for the next one.
+            for i in 0..<maskRe.count { maskRe[i] = 0; maskIm[i] = 0 }
+            modelFailures += 1
+            if (error as NSError).domain == "VocalizerCoreMLException",
+               let fresh = try? MLModel(contentsOf: compiledURL, configuration: modelConfig) { model = fresh }
+        }
         lastModelTime = CFAbsoluteTimeGetCurrent() - t1
         synthesize()
 
@@ -188,7 +203,10 @@ public final class RoformerSeparator: Separating {
 
     /// Runs the network and turns its (band) mask into a full complex mask per (f s) bin.
     private func runModel() throws {
-        let out = try model.prediction(from: provider)
+        var nsError: NSError?
+        guard let out = VCLPredict(model, provider, MLPredictionOptions(), &nsError) else {
+            throw nsError ?? NSError(domain: "Roformer", code: 2, userInfo: [NSLocalizedDescriptionKey: "prediction failed"])
+        }
         guard let arr = out.featureValue(for: "mask")?.multiArrayValue else {
             throw NSError(domain: "Roformer", code: 1, userInfo: [NSLocalizedDescriptionKey: "model returned no mask"])
         }

@@ -77,6 +77,8 @@ public final class StreamingSeparator: Separating {
     /// Seconds spent per step (STFT + model + iSTFT), and model only.
     public private(set) var lastStepTime = 0.0
     public private(set) var lastModelTime = 0.0
+    /// Model calls that failed and were replaced by silence.
+    public private(set) var modelFailures = 0
 
     public init(config: SeparatorConfig, model: MDXModel) {
         precondition(model.frames == config.frames)
@@ -124,12 +126,18 @@ public final class StreamingSeparator: Separating {
             spec.analyze(left: l.baseAddress!, right: r.baseAddress!, into: model.inputPointer)
         } }
         let t1 = CFAbsoluteTimeGetCurrent()
-        try model.run { view in
-            let t2 = CFAbsoluteTimeGetCurrent()
-            lastModelTime = t2 - t1
-            outL.withUnsafeMutableBufferPointer { l in outR.withUnsafeMutableBufferPointer { r in
-                spec.synthesize(view, left: l.baseAddress!, right: r.baseAddress!)
-            } }
+        do {
+            try model.run { view in
+                let t2 = CFAbsoluteTimeGetCurrent()
+                lastModelTime = t2 - t1
+                outL.withUnsafeMutableBufferPointer { l in outR.withUnsafeMutableBufferPointer { r in
+                    spec.synthesize(view, left: l.baseAddress!, right: r.baseAddress!)
+                } }
+            }
+        } catch {
+            // A failed model call (rare Core ML error) becomes one silent step, so the stream keeps its timing.
+            for i in 0..<chunk { outL[i] = 0; outR[i] = 0 }
+            modelFailures += 1
         }
 
         // Segment [start, start + step + fade) of the window.
