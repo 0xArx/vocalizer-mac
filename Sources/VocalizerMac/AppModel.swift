@@ -438,9 +438,56 @@ final class AppModel: ObservableObject {
         if fresh != sources { sources = fresh }
     }
 
+    // MARK: switching feedback
+
+    /// Mode whose model is loading in the background (the previous mode keeps playing meanwhile).
+    @Published private(set) var preparing: Mode?
+    /// Until when videos are holding their picture for our delay (after a switch, or when sound starts).
+    @Published private(set) var catchUpUntil: Date?
+    private var heardSoundAt: Date?, silentSince: Date?
+
+    var catchUpSeconds: Int? {
+        guard let until = catchUpUntil else { return nil }
+        let left = until.timeIntervalSinceNow
+        return left > 0.2 ? Int(left.rounded(.up)) : nil
+    }
+
+    /// Long delays (Best, Clean) make videos wait visibly: show a countdown while they do.
+    private func startCatchUp() {
+        let delay = engine.stats.totalLatencyMs / 1000
+        guard enabled, delay >= 1 else { return }
+        catchUpUntil = Date().addingTimeInterval(delay)
+        catchUpTotal = delay
+    }
+    private(set) var catchUpTotal = 1.0
+
+    /// 0...1 progress through the current wait, for the bar under the header.
+    var catchUpProgress: Double? {
+        guard let until = catchUpUntil, catchUpSeconds != nil else { return nil }
+        return min(1, max(0, 1 - until.timeIntervalSinceNow / catchUpTotal))
+    }
+
     private func apply() {
         driverInstalled = AudioProcesses.vocalizerDevice() != nil
         defer { refreshOutputs() }
+        // Best's model takes a few seconds to load and warm up on the GPU: do it off the main thread and keep
+        // the current mode playing until it is ready, then come back here.
+        if enabled, ready, mode == .supreme, let files = SupremeModel.files(), !engine.isRoformerLoaded(files.model) {
+            if preparing != .supreme {
+                preparing = .supreme
+                Task.detached(priority: .userInitiated) { [engine] in
+                    var message: String?
+                    do { try engine.preloadRoformer(model: files.model, info: files.info) } catch { message = error.localizedDescription }
+                    let failure = message
+                    await MainActor.run {
+                        self.preparing = nil
+                        if let failure { self.error = "Best mode: \(failure)"; return }
+                        if self.enabled && self.mode == .supreme { self.apply() }
+                    }
+                }
+            }
+            return
+        }
         guard enabled else {
             engine.stop()
             restoreRealOutput()
@@ -448,6 +495,15 @@ final class AppModel: ObservableObject {
             reportedLatencyMs = 0
             status = ready ? "Off" : status
             stats = engine.stats
+        // Sound starting after a pause (a new video, play, or a seek): videos hold their picture for our
+        // delay, so count it down.
+        // (Paused players send digital silence; real quiet passages stay above -80 dB.)
+        if stats.running && stats.inputPeak > 1e-4 {
+            if let since = silentSince, Date().timeIntervalSince(since) > 1.0 { startCatchUp() }
+            silentSince = nil
+        } else if silentSince == nil {
+            silentSince = Date()
+        }
             return
         }
         guard ready else { status = "Loading model…"; return }
@@ -479,6 +535,7 @@ final class AppModel: ObservableObject {
             lastHeard = Date()
             starts += 1
             status = "On"
+            startCatchUp()
         } catch {
             self.error = error.localizedDescription
             NSLog("Vocalizer: start failed: \(error)")
@@ -512,6 +569,15 @@ final class AppModel: ObservableObject {
         if !ready { return }
         if enabled && !engine.stats.running { apply() }
         stats = engine.stats
+        // Sound starting after a pause (a new video, play, or a seek): videos hold their picture for our
+        // delay, so count it down.
+        // (Paused players send digital silence; real quiet passages stay above -80 dB.)
+        if stats.running && stats.inputPeak > 1e-4 {
+            if let since = silentSince, Date().timeIntervalSince(since) > 1.0 { startCatchUp() }
+            silentSince = nil
+        } else if silentSince == nil {
+            silentSince = Date()
+        }
         if stats.running {
             if stats.inputPeak > 1e-4 { lastHeard = Date() }
             silentFor = Date().timeIntervalSince(lastHeard)

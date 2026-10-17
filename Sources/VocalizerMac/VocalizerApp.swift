@@ -8,7 +8,12 @@ struct VocalizerApp: App {
         MenuBarExtra {
             MenuView().environmentObject(model)
         } label: {
-            Image(systemName: model.enabled ? "music.mic.circle.fill" : "music.mic")
+            // An hourglass while a video waits for the voice (Best's ~7 s) or Best is loading.
+            if model.preparing != nil || model.catchUpSeconds != nil {
+                Image(systemName: Int(Date().timeIntervalSince1970 * 2) % 2 == 0 ? "hourglass.tophalf.filled" : "hourglass.bottomhalf.filled")
+            } else {
+                Image(systemName: model.enabled ? "music.mic.circle.fill" : "music.mic")
+            }
         }
         .menuBarExtraStyle(.window)
     }
@@ -21,6 +26,7 @@ struct MenuView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header.padding(16)
+            waitBar
             notices
             Divider().padding(.horizontal, 16)
             modePicker.padding(16)
@@ -59,8 +65,22 @@ struct MenuView: View {
         }
     }
 
+    /// A thin bar while Best loads (sliding) or while videos wait for the voice (filling).
+    @ViewBuilder private var waitBar: some View {
+        if model.preparing != nil {
+            ProgressView().progressViewStyle(.linear).controlSize(.small)
+                .padding(.horizontal, 16).padding(.top, -6).padding(.bottom, 12)
+        } else if on, let p = model.catchUpProgress {
+            ProgressView(value: p).progressViewStyle(.linear).controlSize(.small).tint(.accentColor)
+                .padding(.horizontal, 16).padding(.top, -6).padding(.bottom, 12)
+                .animation(.linear(duration: 0.5), value: p)
+        }
+    }
+
     private var statusLine: String {
         if !model.ready { return "Getting ready…" }
+        if let p = model.preparing { return "Preparing \(p.title)…" }
+        if on, let n = model.catchUpSeconds { return "Video starts in \(n) s" }
         if model.enabled && model.mode.separation == nil { return "Download needed for Best" }
         if model.enabled && !model.stats.running { return "Starting…" }
         if on { return "Removing the music" }
@@ -115,7 +135,11 @@ struct MenuView: View {
                 ForEach(model.availableModes) { m in
                     Button { model.mode = m } label: {
                         VStack(spacing: 5) {
-                            Image(systemName: m.symbol).font(.system(size: 15, weight: .medium))
+                            if model.preparing == m {
+                                ProgressView().controlSize(.small).frame(height: 18)
+                            } else {
+                                Image(systemName: m.symbol).font(.system(size: 15, weight: .medium)).frame(height: 18)
+                            }
                             Text(m.title).font(.system(size: 11.5, weight: .medium))
                         }
                         .frame(maxWidth: .infinity).padding(.vertical, 9)

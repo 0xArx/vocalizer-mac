@@ -64,6 +64,10 @@ but is no longer offered in the menu.)
   **Output** picker in the Vocalizer menu switches it directly.
 - With sync off, you can pick a single app to filter (Source).
 - **⌥⇧V** (Option-Shift-V) switches it on or off from anywhere.
+- **Waiting is visible.** With Best (and Clean), videos hold their picture until the voice arrives: the menu shows
+  "Video starts in 6 s" with a progress bar, and the menu bar icon turns into an hourglass, after switching mode and
+  each time sound starts again (a new video, play, or seeking). Best loads in the background with a spinner on its
+  tile while the current mode keeps playing (it used to freeze the menu for ~6 s).
 - **Open at login** is in the menu; Vocalizer remembers whether it was on.
 - When a new version is out, the menu shows **Update**: one click runs the installer and reopens the app.
 - Things that can't wait (games, live calls) still hear the delay. Use Speech mode for calls.

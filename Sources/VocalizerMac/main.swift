@@ -111,8 +111,8 @@ if let i = args.firstIndex(of: "--sync-run"), args.count >= i + 4 {
                 }
                 let s = model.stats
                 let dev = (try? AudioProcesses.defaultOutputDevice()).flatMap { AudioProcesses.name(of: $0) } ?? "?"
-                lines.append(String(format: "t=%4.0f out=%@ default=%@ starts=%d reported=%.0f total=%.0f underruns=%d in=%.3f out=%.3f rtf=%.2f err=%@",
-                                    Date().timeIntervalSince(t0!), s.outputDevice, dev, model.starts, model.reportedLatencyMs, s.totalLatencyMs,
+                lines.append(String(format: "t=%4.1f mode=%@ preparing=%@ catchup=%@ out=%@ default=%@ starts=%d reported=%.0f total=%.0f underruns=%d in=%.3f out=%.3f rtf=%.2f err=%@",
+                                    Date().timeIntervalSince(t0!), model.mode.title, model.preparing?.title ?? "-", model.catchUpSeconds.map(String.init) ?? "-", s.outputDevice, dev, model.starts, model.reportedLatencyMs, s.totalLatencyMs,
                                     s.underruns, s.inputPeak, s.outputPeak, s.realTimeFactor, model.error ?? "-"))
                 try? lines.joined(separator: "\n").write(to: logURL, atomically: true, encoding: .utf8)
                 // VOCALIZER_TEST_WAKE=<s>: post the "Mac woke up" notification once, at that time.

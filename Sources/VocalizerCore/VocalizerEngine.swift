@@ -81,6 +81,12 @@ public final class VocalizerEngine {
     public enum Separation { case mdx(SeparatorConfig), deepFilter, roformer(model: URL, info: URL) }
     private var roformer: (url: URL, sep: RoformerSeparator)?
 
+    /// True when the Supreme model at `model` is loaded and warmed up (starting it is then instant).
+    public func isRoformerLoaded(_ model: URL) -> Bool {
+        modelLock.lock(); defer { modelLock.unlock() }
+        return roformer?.url == model
+    }
+
     /// Loads (and warms up) the Supreme model ahead of time; the engine reuses it.
     public func preloadRoformer(model: URL, info: URL) throws {
         modelLock.lock(); defer { modelLock.unlock() }
