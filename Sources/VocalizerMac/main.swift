@@ -121,6 +121,13 @@ if let i = args.firstIndex(of: "--sync-run"), args.count >= i + 4 {
                     lines.append("simulated wake")
                     NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: NSWorkspace.shared)
                 }
+                // VOCALIZER_TEST_SWITCH=<s>:<mode>: switch mode once at that time (like clicking it in the menu).
+                if let spec = ProcessInfo.processInfo.environment["VOCALIZER_TEST_SWITCH"]?.split(separator: ":"), spec.count == 2,
+                   let at = Double(spec[0]), Date().timeIntervalSince(t0!) >= at,
+                   let m = Mode(rawValue: String(spec[1])), model.mode != m, !lines.contains(where: { $0.hasPrefix("switched") }) {
+                    lines.append("switched to \(m.rawValue)")
+                    model.mode = m
+                }
                 if Date().timeIntervalSince(t0!) > seconds {
                     model.enabled = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }

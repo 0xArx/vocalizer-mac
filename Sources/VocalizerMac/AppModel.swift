@@ -392,12 +392,29 @@ final class AppModel: ObservableObject {
         guard let v = AudioProcesses.vocalizerDevice(), let real = realOutput() else { return }
         let s = engine.stats
         let ms = s.totalLatencyMs
+        // Same delay as players already use (restart after wake, speakers with near-identical latency):
+        // no need to make them reopen, which would cause a visible hiccup. 25 ms is below what lip sync shows.
+        let previous = reportedLatencyMs
+        let bounce = bounce && (previous == 0 || abs(ms - previous) > 25)
         let rate = (try? CA_nominalRate(v)) ?? 48_000
         try? AudioProcesses.setVocalizerLatency(frames: Int(ms / 1000 * rate))
         reportedLatencyMs = ms
         let current = try? AudioProcesses.defaultOutputDevice()
-        if current == v && bounce { setDefaultOutput(real) }
-        if current != v || bounce { setDefaultOutput(v) }
+        if current == v && bounce {
+            // Players only re-read the delay when they reopen the device. An instant away-and-back switch
+            // is coalesced by Chrome (measured: video stayed on the old delay), so stay on the real
+            // speakers long enough for them to reopen. It is silent: every app is muted by our tap and
+            // its audio still goes through Vocalizer either way.
+            setDefaultOutput(real)
+            let hold = ProcessInfo.processInfo.environment["VOCALIZER_BOUNCE_MS"].flatMap(Double.init) ?? 800
+            ignoreOutputChangesUntil = Date().addingTimeInterval(hold / 1000 + 1.5)
+            DispatchQueue.main.asyncAfter(deadline: .now() + hold / 1000) { [weak self] in
+                guard let self, self.enabled, self.syncActive else { return }
+                self.setDefaultOutput(v)
+            }
+        } else if current != v {
+            setDefaultOutput(v)
+        }
     }
 
     var source: AudioSource {

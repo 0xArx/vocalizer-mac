@@ -169,8 +169,12 @@ permission is needed) and plays the vocals on the real output through the same a
   visibly re-sync (stutter and catch-up).
 - Measured in real Chrome with the app running (sync, Live): 361 frames in 12 s at 30 fps, 0 freezes, 0 skipped,
   0 dropped; `outputLatency` steady at 416 ms; one engine start, 0 underruns over the run.
-- Apps read the latency when they open the device, so a mode change briefly switches the default output away and
-  back to make them re-read it (one re-sync). If a video still looks off after switching modes, pause and play it.
+- Apps read the latency only when they open the device. When the delay changes by more than 25 ms (mode switch,
+  e.g. Live to Quality, or speakers with a different latency), the app moves the default output to the real
+  speakers for 0.8 s and back, so players reopen and re-read it. An instant away-and-back switch is not enough:
+  Chrome coalesced it and kept the old delay (video 1.5 s ahead after Live to Quality; measured). The hold is
+  silent because the tap mutes every app wherever it plays. In Chrome the video then pauses once (about 1.5 s
+  for Live to Quality) and stays in sync. A restart with the same delay (e.g. after wake) does not re-sync at all.
 
 ### Supreme mode (MelBand RoFormer)
 
