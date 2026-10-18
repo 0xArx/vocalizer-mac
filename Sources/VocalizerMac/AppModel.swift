@@ -75,6 +75,13 @@ final class AppModel: ObservableObject {
         }
     }
     private var restoring = false
+    /// "Fast only": hide the other modes and always use Fast, for the simplest possible menu.
+    @Published var fastOnly = UserDefaults.standard.bool(forKey: "fastOnly") {
+        didSet {
+            if !AppModel.testing { UserDefaults.standard.set(fastOnly, forKey: "fastOnly") }
+            if fastOnly && mode != .live { mode = .live }
+        }
+    }
     /// Diagnostic runs (--selftest, --snapshot, ...) must not change the user's saved settings.
     nonisolated static let testing = CommandLine.arguments.contains { $0.hasPrefix("--") }
     @Published var openAtLogin = SMAppService.mainApp.status == .enabled {

@@ -29,8 +29,10 @@ struct MenuView: View {
             header.padding(16)
             waitBar
             notices
-            Divider().padding(.horizontal, 16)
-            modePicker.padding(16)
+            if !model.fastOnly {
+                Divider().padding(.horizontal, 16)
+                modePicker.padding(16)
+            }
             Divider().padding(.horizontal, 16)
             outputRow.padding(.horizontal, 16).padding(.vertical, 10)
             Divider().padding(.horizontal, 16)
@@ -201,9 +203,12 @@ struct MenuView: View {
 
             if showSettings {
                 VStack(alignment: .leading, spacing: 12) {
+                    settingToggle("Fast only", "Hide the other modes and always use Fast.", $model.fastOnly)
                     settingToggle("Keep video in sync", "Videos wait for the voice, so lips always match.", $model.syncVideo)
                     settingToggle("Open at login", "Start Vocalizer when you log in.", $model.openAtLogin)
-                    settingToggle("Show countdown on screen", "While a video waits for the voice (Best, Clean).", $screenCountdown)
+                    if !model.fastOnly {
+                        settingToggle("Show countdown on screen", "While a video waits for the voice (Best, Clean).", $screenCountdown)
+                    }
                     if !model.syncActive {
                         HStack {
                             Text("Only remove music from").font(.system(size: 12.5))

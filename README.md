@@ -54,7 +54,8 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 (In the code and the measurements below these are `live`, `quality`, `supreme` and `ultra`; `balanced` still exists
 but is no longer offered in the menu.)
 
-- **Settings** (folded away in the menu): **Keep video in sync**, **Open at login**, and with sync off, which app
+- **Settings** (folded away in the menu): **Fast only** (hides the mode tiles and always uses Fast: the menu is
+  then just the switch and where it plays), **Keep video in sync**, **Open at login**, and with sync off, which app
   to filter. Everything else is the switch, the mode and where it plays.
 - **Keep video in sync** (on by default): all sound goes through the *Vocalizer* audio device, which tells video
   players the delay, so the picture waits for the voice. Your speakers or headphones stay the real output, the volume
