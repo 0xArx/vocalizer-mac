@@ -110,6 +110,14 @@ final class AppModel: ObservableObject {
         }
     }
     @Published private(set) var driverInstalled = AudioProcesses.vocalizerDevice() != nil
+    /// Optional swear-word filter (Apple's on-device speech recognition). Adds no delay.
+    @Published var muteSwearWords = UserDefaults.standard.bool(forKey: "muteSwearWords") {
+        didSet {
+            if !AppModel.testing { UserDefaults.standard.set(muteSwearWords, forKey: "muteSwearWords") }
+            engine.setProfanityFilter(muteSwearWords)
+        }
+    }
+    let swearFilterSupported = VocalizerEngine.profanityFilterSupported
     @Published private(set) var reportedLatencyMs = 0.0
     // MARK: Supreme model download
 
@@ -208,6 +216,7 @@ final class AppModel: ObservableObject {
         if !AppModel.testing { restoreRealOutput() }
         installSignalHandlers()
         startWatchdog()
+        engine.setProfanityFilter(muteSwearWords)
         if !AppModel.testing {
             hotKey = HotKey { [weak self] in
                 guard let self, self.ready else { return }

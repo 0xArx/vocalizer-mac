@@ -32,7 +32,14 @@ public enum LoopbackTest {
         }
         defer { if let realOutput { try? AudioProcesses.setDefaultOutput(realOutput) } }
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+        // VOCALIZER_TEST_PROFANITY=1: run with the swear-word filter on.
+        let wantFilter = ProcessInfo.processInfo.environment["VOCALIZER_TEST_PROFANITY"] == "1"
+        log("swear filter requested: \(wantFilter), supported: \(VocalizerEngine.profanityFilterSupported)")
+        if wantFilter { engine.setProfanityFilter(true) }
         try engine.preload()
+
+        // Load Best's model before the source starts, so the test hears it from the first second.
+        if case .roformer(let model, let info) = separation { try engine.preloadRoformer(model: model, info: info) }
 
         // `file` is an audio file to play with afplay, or "app:<bundle id>" to tap a running app.
         var player: Process?
@@ -132,8 +139,14 @@ public enum LoopbackTest {
             log(String(format: "t=%4.1fs in %.3f out %.3f | latency %.0f ms (pipeline) + %.0f ms (device) | RTF %.3f, step %.1f ms (model %.1f), worst %.1f | underruns %d",
                          s.capturedSeconds, s.inputPeak, s.outputPeak, s.pipelineLatencyMs, s.deviceLatencyMs,
                          s.realTimeFactor, s.stepMs, s.modelMs, s.worstStepMs, s.underruns))
+            if s.profanityFilter || s.profanityPreparing || s.profanityError != nil {
+                log("  swear filter: \(s.profanityFilter ? "running" : s.profanityPreparing ? "starting" : "error: \(s.profanityError ?? "")"), muted \(s.wordsMuted), late \(s.wordsLate) | \(engine.profanityDebug)")
+            }
         }
         let final = engine.stats
+        let swearLog = engine.profanityEvents
+        for e in swearLog.events { log("  mute " + e) }
+        log("  swear clock anchored at capture frame \(swearLog.anchor)")
         AudioDeviceStop(recAgg, recProc)
         engine.stop()
         player?.terminate()
@@ -149,7 +162,7 @@ public enum LoopbackTest {
                                    "pipelineLatencyMs": final.pipelineLatencyMs, "deviceLatencyMs": final.deviceLatencyMs,
                                    "algorithmicLatencyMs": final.algorithmicLatencyMs, "realTimeFactor": final.realTimeFactor,
                                    "stepMs": final.stepMs, "modelMs": final.modelMs, "worstStepMs": final.worstStepMs,
-                                   "underruns": final.underruns]
+                                   "underruns": final.underruns, "wordsMuted": final.wordsMuted, "wordsLate": final.wordsLate]
         try JSONSerialization.data(withJSONObject: meta, options: .prettyPrinted).write(to: outDir.appendingPathComponent("meta.json"))
         log("recorded \(orig.count / 2) / \(mine.count / 2) frames, input layout [\(layout)]")
     }

@@ -100,6 +100,7 @@ Layout:
 | `Sources/VocalizerCore/StreamingSeparator.swift` | sliding-window MDX separation, presets (live / balanced / quality) |
 | `Sources/VocalizerCore/MDXSpectrogram.swift`, `MDXModel.swift` | STFT/iSTFT matching UVR, Core ML wrapper |
 | `Sources/VocalizerCore/DeepFilterSeparator.swift` | Speech mode (DeepFilterNet3 via `libdf.dylib`, loaded at runtime) |
+| `Sources/VocalizerCore/ProfanityFilter.swift`, `Sources/CRing/cmute.c` | swear-word filter: SpeechAnalyzer on the captured audio, mute events applied on the IO thread (no added delay); test with `tools/analyze_profanity.py` |
 | `Sources/VocalizerCore/RoformerSeparator.swift`, `SupremeModel.swift` | Supreme mode (MelBand RoFormer on the GPU) and its on-demand download (`models-v1` release) |
 | `Sources/VocalizerCore/AudioProcesses.swift` | process list, devices, volume, the Vocalizer device's `'vlat'` latency property |
 | `Sources/VocalizerMac/` | SwiftUI menu bar app; `main.swift` also has `--selftest`, `--sync-run`, `--snapshot`, `--list` |

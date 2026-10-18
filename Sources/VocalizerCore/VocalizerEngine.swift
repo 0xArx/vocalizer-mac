@@ -23,6 +23,14 @@ public struct EngineStats {
     public var realTimeFactor = 0.0
     public var stepMs = 0.0, worstStepMs = 0.0, modelMs = 0.0
     public var underruns = 0
+    /// Swear-word filter: on, words muted in time, words heard before they could be muted.
+    public var profanityFilter = false
+    /// The filter is switched on but the recognizer is still starting (first time: downloading Apple's model).
+    public var profanityPreparing = false
+    public var profanityError: String?
+    public var wordsMuted = 0, wordsLate = 0
+    /// Swear words the filter has caught so far (each counted once).
+    public var wordsCaught = 0
     public var inputPeak: Float = 0, outputPeak: Float = 0
     public var capturedSeconds = 0.0
     public var totalLatencyMs: Double { pipelineLatencyMs + deviceLatencyMs }
@@ -52,6 +60,18 @@ public final class VocalizerEngine {
     /// Delay added by underruns since start (frames).
     private var addedDelay: Int64 = 0
     private var primeFrames = 0
+    // Swear-word filter: events from ProfanityFilter, applied on the IO thread at capture index + playOffset.
+    private let muteQueue = cmute_create()!
+    private var playOffset: Int64 = 0
+    private let activeMutes = UnsafeMutablePointer<CMuteEvent>.allocate(capacity: 32)
+    private var activeMuteCount = 0
+    private var muteGain: Float = 1
+    private var mutedWords = 0, lateWords = 0
+    private var filterLock = NSLock()
+    private var filterObject: AnyObject?
+    private var filterWanted = false
+    private var filterError: String?
+    private var inputFramesRead: Int64 = 0
     /// 0-based output channels for left/right (equal on a mono device).
     private var stereoLeft = 0, stereoRight = 1
     private var resamplerDelay = 0.0
@@ -66,6 +86,14 @@ public final class VocalizerEngine {
         statsLock.lock(); defer { statsLock.unlock() }
         var s = _stats
         s.underruns = underruns
+        s.wordsMuted = mutedWords
+        s.wordsLate = lateWords
+        filterLock.lock()
+        s.profanityFilter = filterObject != nil
+        s.profanityPreparing = filterWanted && filterObject == nil && filterError == nil && s.running
+        s.profanityError = filterWanted ? filterError : nil
+        if #available(macOS 26.0, iOS 26.0, *), let pf = filterObject as? ProfanityFilter { s.wordsCaught = pf.wordsFound }
+        filterLock.unlock()
         s.inputPeak = inPeak; s.outputPeak = outPeak
         if s.running, s.sampleRate > 0 {
             // Output stream sample k is input sample k - streamDelay, and it plays primeFrames after capture.
@@ -254,6 +282,13 @@ public final class VocalizerEngine {
         let zeros = [Float](repeating: 0, count: prime * 2)
         _ = cring_write(outRing, zeros, UInt32(prime))
         captured = 0; consumed = 0; underruns = 0; inPeak = 0; outPeak = 0
+        // A captured frame c plays when the output counter reaches c + playOffset.
+        playOffset = Int64(prime) + Int64(Double(sep.streamDelay) * rate / sep.sampleRate)
+            + Int64(StreamResampler.roundTripDelay(rate: rate, via: sep.sampleRate) * rate)
+        var drop = CMuteEvent()
+        while cmute_pop(muteQueue, &drop) != 0 {}
+        activeMuteCount = 0; muteGain = 1; mutedWords = 0; lateWords = 0; inputFramesRead = 0
+        startFilterIfWanted(rate: rate)
         holding = false; fadeIn = 256; addedDelay = 0; owed = 0
         self.fixedDelay = fixedDelay
         cushionFrames = Int(0.04 * rate) // 40 ms extra after each dropout
@@ -303,6 +338,7 @@ public final class VocalizerEngine {
         worker = nil
         cring_destroy(inRing); inRing = nil
         cring_destroy(outRing); outRing = nil
+        stopFilter()
         statsLock.lock(); _stats.running = false; statsLock.unlock()
     }
 
@@ -396,6 +432,7 @@ public final class VocalizerEngine {
                     fadeIn += 1
                 }
             }
+            applyMutes(p, frames: want)
             let target = outputGain
             if target != 1 || currentGain != 1 {
                 let stepGain = (target - currentGain) / Float(max(want, 1))
@@ -435,6 +472,106 @@ public final class VocalizerEngine {
         }
     }
 
+    // MARK: swear-word filter
+
+    /// Turns the filter on or off (takes effect immediately if running; remembered for the next start).
+    public func setProfanityFilter(_ on: Bool) {
+        filterWanted = on
+        if on {
+            statsLock.lock(); let rate = _stats.running ? _stats.sampleRate : 0; statsLock.unlock()
+            if rate > 0 { startFilterIfWanted(rate: rate) }
+        } else {
+            stopFilter()
+        }
+    }
+
+    /// Diagnostics: the filter's mute log and the capture frame its clock is anchored to.
+    public var profanityEvents: (anchor: Int64, events: [String]) {
+        filterLock.lock(); let f = filterObject; filterLock.unlock()
+        if #available(macOS 26.0, iOS 26.0, *), let pf = f as? ProfanityFilter { return (pf.anchorFrame, pf.eventLog) }
+        return (-1, [])
+    }
+
+    /// Diagnostics for the self-test log.
+    public var profanityDebug: String {
+        filterLock.lock(); let f = filterObject; filterLock.unlock()
+        if #available(macOS 26.0, iOS 26.0, *), let pf = f as? ProfanityFilter {
+            return "fed \(pf.buffersFed) dropped \(pf.buffersDropped) results \(pf.resultsSeen) found \(pf.wordsFound) last \"\(pf.lastText)\""
+        }
+        return "-"
+    }
+
+    public static var profanityFilterSupported: Bool {
+        if #available(macOS 26.0, iOS 26.0, *) { return ProfanityFilter.isSupported }
+        return false
+    }
+
+    private func startFilterIfWanted(rate: Double) {
+        guard filterWanted, #available(macOS 26.0, iOS 26.0, *) else { return }
+        stopFilter()
+        let f = ProfanityFilter(inputRate: rate, queue: muteQueue)
+        Task {
+            do {
+                try await f.start()
+                filterLock.withLock { filterObject = f; filterError = nil }
+            } catch {
+                NSLog("Vocalizer: swear-word filter unavailable: \(error.localizedDescription)")
+                filterLock.withLock { filterError = error.localizedDescription }
+            }
+        }
+    }
+
+    private func stopFilter() {
+        filterLock.lock(); let f = filterObject; filterObject = nil; filterLock.unlock()
+        if #available(macOS 26.0, iOS 26.0, *), let f = f as? ProfanityFilter { f.stop() }
+    }
+
+    /// Worker thread: hands the captured audio to the recognizer with its capture index.
+    private func feedFilter(_ l: [Float], _ r: [Float], _ n: Int) {
+        defer { inputFramesRead += Int64(n) }
+        filterLock.lock(); let f = filterObject; filterLock.unlock()
+        guard let f, #available(macOS 26.0, iOS 26.0, *), let pf = f as? ProfanityFilter else { return }
+        l.withUnsafeBufferPointer { lp in r.withUnsafeBufferPointer { rp in
+            pf.feed(left: lp.baseAddress!, right: rp.baseAddress!, count: n, startFrame: inputFramesRead)
+        } }
+    }
+
+    /// IO thread: mute the frames covered by swear-word ranges (5 ms fades). No locks, no allocation.
+    private func applyMutes(_ p: UnsafeMutablePointer<Float>, frames: Int) {
+        let offset = playOffset + addedDelay
+        var ev = CMuteEvent()
+        while cmute_pop(muteQueue, &ev) != 0 {
+            if ev.kind == 2 { // cancel a provisional range (replaced by the exact one) unless it is already playing
+                for j in 0..<activeMuteCount where activeMutes[j].id == ev.id && activeMutes[j].start > consumed {
+                    activeMutes[j].end = Int64.min
+                }
+                continue
+            }
+            let start = ev.start + offset, end = ev.end + offset
+            if end <= consumed { if ev.kind == 0 { lateWords += 1 }; continue }
+            if ev.kind == 0 { if start < consumed { lateWords += 1 } else { mutedWords += 1 } }
+            if activeMuteCount < 32 {
+                activeMutes[activeMuteCount] = CMuteEvent(start: start, end: end, id: ev.id, kind: ev.kind)
+                activeMuteCount += 1
+            }
+        }
+        if activeMuteCount == 0 && muteGain == 1 { return }
+        let step: Float = 1 / 240 // ~5 ms at 48 kHz
+        for i in 0..<frames {
+            let idx = consumed + Int64(i)
+            var muted = false
+            for j in 0..<activeMuteCount where idx >= activeMutes[j].start && idx < activeMutes[j].end { muted = true; break }
+            muteGain = muted ? max(0, muteGain - step) : min(1, muteGain + step)
+            if muteGain < 1 { p[2 * i] *= muteGain; p[2 * i + 1] *= muteGain }
+        }
+        // Drop finished ranges.
+        var k = 0
+        for j in 0..<activeMuteCount where activeMutes[j].end > consumed + Int64(frames) {
+            activeMutes[k] = activeMutes[j]; k += 1
+        }
+        activeMuteCount = k
+    }
+
     // MARK: worker thread
 
     private func workLoop(rate: Double, modelRate: Double) {
@@ -451,6 +588,7 @@ public final class VocalizerEngine {
             guard n > 0 else { continue }
             l.removeAll(keepingCapacity: true); r.removeAll(keepingCapacity: true)
             for i in 0..<n { l.append(inter[2 * i]); r.append(inter[2 * i + 1]) }
+            feedFilter(l, r, n)
             down.process(left: l, right: r, count: n)
             sep.push(left: down.outL, right: down.outR, count: down.outL.count)
             do {

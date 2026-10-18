@@ -14,3 +14,6 @@ uint32_t cring_write(CRing *r, const float *interleaved, uint32_t frames);
 uint32_t cring_read(CRing *r, float *interleaved, uint32_t frames);
 // Consumer side only: drop everything currently readable.
 void cring_clear(CRing *r);
+
+// Swear-word filter mute events (see cmute.h); included here because cring.h is the module umbrella header.
+#include "cmute.h"

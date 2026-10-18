@@ -64,6 +64,11 @@ but is no longer offered in the menu.)
   Control Center shows **Vocalizer (your headphones)** so you can see where the sound really goes, and the
   **Output** picker in the Vocalizer menu switches it directly.
 - With sync off, you can pick a single app to filter (Source).
+- **Mute swear words** (switch in the menu): silences swear words, recognised on your Mac by Apple's speech
+  recognition (macOS 26+), with **no added delay**. It works inside the delay each mode already has, so it depends on
+  the mode. Measured on a test clip with 7 swear words over music: **Best** silences 6 of 7 precisely, **Clean** 5 of
+  7 (sometimes clipping part of the next word), **Fast/Speech** can't (a word plays before it can be recognised).
+  The misses were words the recogniser misheard. Delay with the filter on vs off: 7.36/7.27 s vs 7.26/7.45 s (Best).
 - **⌥⇧V** (Option-Shift-V) switches it on or off from anywhere.
 - **Waiting is visible.** With Best (and Clean), videos hold their picture until the voice arrives: the menu shows
   "Video starts in 6 s" with a progress bar, a countdown ring appears in the middle of the screen (like the volume

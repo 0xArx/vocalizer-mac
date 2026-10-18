@@ -35,6 +35,9 @@ struct MenuView: View {
             }
             Divider().padding(.horizontal, 16)
             outputRow.padding(.horizontal, 16).padding(.vertical, 10)
+            if model.swearFilterSupported {
+                swearRow.padding(.horizontal, 16).padding(.bottom, 10)
+            }
             Divider().padding(.horizontal, 16)
             settings.padding(.horizontal, 16).padding(.vertical, 10)
             footer.padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 2)
@@ -182,6 +185,51 @@ struct MenuView: View {
                 ForEach(model.outputs) { o in Text(o.name).tag(o.id) }
             }
             .labelsHidden().pickerStyle(.menu).fixedSize()
+        }
+    }
+
+    // MARK: swear-word filter
+
+    private var swearRow: some View {
+        let s = model.stats
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                Image(systemName: model.muteSwearWords ? "speaker.slash.fill" : "speaker.slash")
+                    .foregroundStyle(model.muteSwearWords ? Color.accentColor : .secondary).frame(width: 18)
+                Text("Mute swear words").font(.system(size: 12.5))
+                Spacer()
+                if model.muteSwearWords && on {
+                    Group {
+                        if s.profanityPreparing {
+                            HStack(spacing: 4) { ProgressView().controlSize(.mini); Text("Getting ready") }
+                        } else if s.profanityError != nil {
+                            Text("Unavailable")
+                        } else if s.profanityFilter {
+                            Text(s.wordsCaught == 0 ? "Listening" : "\(s.wordsCaught) muted")
+                        }
+                    }
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Toggle("", isOn: $model.muteSwearWords).toggleStyle(.switch).controlSize(.mini).labelsHidden()
+            }
+            if model.muteSwearWords {
+                Text(swearHint).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true).padding(.leading, 26)
+            }
+        }
+    }
+
+    private var swearHint: String {
+        if let e = model.stats.profanityError, model.muteSwearWords { return "Speech recognition isn't available: \(e)" }
+        switch model.mode {
+        case .live, .ultra, .balanced:
+            return model.fastOnly
+                ? "Fast is too quick: words play before they're recognized. Turn off Fast only and use Best or Clean."
+                : "This mode is too quick: words play before they're recognized. Use Best or Clean."
+        case .quality:
+            return "Catches most swear words, sometimes with a bit of the next word. Best is more precise."
+        case .supreme:
+            return "Catches nearly every swear word, precisely. Recognized on this Mac."
         }
     }
 
