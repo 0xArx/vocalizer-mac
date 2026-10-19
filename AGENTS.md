@@ -32,7 +32,7 @@ Options (pass after `bash -s --`, e.g. `curl ... | bash -s -- --no-driver`):
 |---|---|
 | `--no-driver` | the user does not want an audio device / no admin rights. Everything works except video sync. |
 | `--from-source` | no release is available, or the user wants to build it. Needs `swift` (Xcode or `xcode-select --install`). |
-| `--with-speech` | with `--from-source`: also build the optional Speech mode (needs Rust: `brew install rust`). |
+| `--with-speech` | with `--from-source`: also build the optional Calls mode (needs Rust: `brew install rust`). |
 | `--no-launch` | don't open the app afterwards. |
 
 ### 3. Things only the user can do (tell them, don't try to do them yourself)
@@ -43,7 +43,7 @@ Options (pass after `bash -s --`, e.g. `curl ... | bash -s -- --no-driver`):
    *System Audio Recording*. They must click **Allow**. If they missed it: System Settings › Privacy & Security ›
    Screen & System Audio Recording › turn on **Vocalizer**.
 3. **Switch it on.** Click the Vocalizer icon (a waveform in a circle) in the menu bar and flip the switch. Mode **Fast** is the default
-   (modes in the menu: Fast, Clean, Best, Speech = `live`, `quality`, `supreme`, `ultra` in code).
+   (modes in the menu: Fast, Clean, Best, Calls = `live`, `quality`, `supreme`, `ultra` in code).
    **Best** (~7 s delay hidden by video sync) needs a one-time 400 MB download: the user clicks **Download** in the
    menu, or run `/Applications/Vocalizer.app/Contents/MacOS/Vocalizer --download-supreme`.
 
@@ -82,14 +82,14 @@ curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.
 | Switched on, but nothing changes / "No audio is coming in" | System Audio Recording permission is off (step 3.2). |
 | Menu shows "Needs the Vocalizer audio device" | Re-run the installer, or click **Install…** in the menu. |
 | Video slightly out of sync after changing modes | Pause and play the video once (players read the delay when they open the device). |
-| Music not fully removed | Expected on heavy reverb / backing vocals. Try **Quality** mode. **Speech** mode is for talking only. |
+| Music not fully removed | Expected on heavy reverb / backing vocals. Try **Quality** mode. **Calls** mode is for calls and games (lowest delay), not videos. |
 
 ## Work on the code
 
 ```bash
 git clone https://github.com/0xArx/vocalizer-mac && cd vocalizer-mac
 scripts/build-app.sh            # -> build/Vocalizer.app   (--install also copies it to /Applications)
-scripts/build-deepfilter.sh     # optional Speech mode (Rust)
+scripts/build-deepfilter.sh     # optional Calls mode (Rust)
 Driver/build-driver.sh          # audio device -> build/Vocalizer.driver; scripts/install-driver.sh installs it
 swift build -c release && .build/release/vocalizer-bench Models fixtures/musdb-fixture all presets  # offline quality/speed
 ```
@@ -110,7 +110,7 @@ Layout:
 | `Sources/VocalizerCore/VocalizerEngine.swift` | tap + private aggregate device + real-time IO proc, lock-free rings, worker thread |
 | `Sources/VocalizerCore/StreamingSeparator.swift` | sliding-window MDX separation, presets (live / balanced / quality) |
 | `Sources/VocalizerCore/MDXSpectrogram.swift`, `MDXModel.swift` | STFT/iSTFT matching UVR, Core ML wrapper |
-| `Sources/VocalizerCore/DeepFilterSeparator.swift` | Speech mode (DeepFilterNet3 via `libdf.dylib`, loaded at runtime) |
+| `Sources/VocalizerCore/DeepFilterSeparator.swift` | Calls mode (DeepFilterNet3 via `libdf.dylib`, loaded at runtime) |
 | `Sources/VocalizerCore/ProfanityFilter.swift`, `Sources/CRing/cmute.c` | swear-word filter: SpeechAnalyzer on the captured audio, mute events applied on the IO thread (no added delay); test with `tools/analyze_profanity.py` |
 | `Sources/VocalizerCore/RoformerSeparator.swift`, `SupremeModel.swift` | Supreme mode (MelBand RoFormer on the GPU) and its on-demand download (`models-v1` release) |
 | `Sources/VocalizerCore/AudioProcesses.swift` | process list, devices, volume, the Vocalizer device's `'vlat'` latency property |

@@ -19,7 +19,7 @@ enum Mode: String, CaseIterable, Identifiable {
     }
     var title: String {
         switch self {
-        case .ultra: "Speech"
+        case .ultra: "Calls"
         case .live: "Fast"
         case .balanced: "Balanced"
         case .quality: "Clean"
@@ -28,7 +28,7 @@ enum Mode: String, CaseIterable, Identifiable {
     }
     var symbol: String {
         switch self {
-        case .ultra: "person.wave.2.fill"
+        case .ultra: "phone.fill"
         case .live: "bolt.fill"
         case .balanced: "slider.horizontal.3"
         case .quality: "sparkles"
@@ -48,8 +48,8 @@ enum Mode: String, CaseIterable, Identifiable {
     func hint(delaySeconds d: Double) -> String {
         let delay = d < 1 ? String(format: "%.1f s", d) : String(format: "%.0f s", d.rounded())
         switch self {
-        case .ultra: return "For talks and calls. Also removes singing. \(delay) behind."
-        case .live: return "For everyday videos. \(delay) behind."
+        case .ultra: return "Lowest delay, for calls and games (\(delay)). Fast sounds cleaner for videos and talks."
+        case .live: return "For videos, talks and music. \(delay) behind."
         case .balanced: return "A little cleaner than Fast. \(delay) behind."
         case .quality: return "Cleaner voices, for music apps. \(delay) behind."
         case .supreme: return "The cleanest voices. \(delay) behind, videos wait for it."
@@ -156,7 +156,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Modes this build can run (Speech needs the optional DeepFilterNet library).
+    /// Modes this build can run (Calls needs the optional DeepFilterNet library).
     /// (Balanced is kept for saved settings but not offered: it was barely different from Fast.)
     let availableModes: [Mode] = Mode.allCases.filter { $0 != .balanced && ($0 != .ultra || AppModel.bundledDeepFilter() != nil) }
     /// Engine starts since launch (diagnostics: should not climb while playing).

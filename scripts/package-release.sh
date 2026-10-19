@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Builds the release zip (app + audio device + Speech mode) for GitHub Releases.
+# Builds the release zip (app + audio device + Calls mode) for GitHub Releases.
 #   scripts/package-release.sh   -> build/Vocalizer-macOS.zip
 set -euo pipefail
 cd "$(dirname "$0")/.."

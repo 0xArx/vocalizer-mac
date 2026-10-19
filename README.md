@@ -34,7 +34,7 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 
 - **Without the audio device** (no video sync, no password): `curl -fsSL .../install.sh | bash -s -- --no-driver`
 - **Build from source** (needs Xcode or `xcode-select --install`):
-  `curl -fsSL .../install.sh | bash -s -- --from-source` (add `--with-speech` for Speech mode; needs `brew install rust`)
+  `curl -fsSL .../install.sh | bash -s -- --from-source` (add `--with-speech` for Calls mode; needs `brew install rust`)
 - **Manually:** download `Vocalizer-macOS.zip` from [Releases](https://github.com/0xArx/vocalizer-mac/releases),
   move `Vocalizer.app` to Applications, open it, and use **Install…** in its menu for the audio device. The app is
   signed with a Developer ID and notarized by Apple, so it opens with no warning.
@@ -51,7 +51,7 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 | **Fast** (default) | about 0.4 s | everyday videos, music with singing |
 | **Clean** | about 2 s | music apps, cleaner voices |
 | **Best** | about 7 s | the cleanest voices, with video sync on (one-time 400 MB download) |
-| **Speech** | about 0.15 s | talks, vlogs, calls. Also removes singing |
+| **Calls** | about 0.15 s | calls and games: the lowest delay. Also removes singing; Fast sounds cleaner for videos and talks |
 
 (In the code and the measurements below these are `live`, `quality`, `supreme` and `ultra`; `balanced` still exists
 but is no longer offered in the menu.)
@@ -69,7 +69,7 @@ but is no longer offered in the menu.)
 - **Mute swear words** (switch in the menu): silences swear words, recognised on your Mac by Apple's speech
   recognition (macOS 26+), with **no added delay**. It works inside the delay each mode already has, so it depends on
   the mode. Measured on a test clip with 7 swear words over music: **Best** silences 6 of 7 precisely, **Clean** 5 of
-  7 (sometimes clipping part of the next word), **Fast/Speech** can't (a word plays before it can be recognised).
+  7 (sometimes clipping part of the next word), **Fast/Calls** can't (a word plays before it can be recognised).
   The misses were words the recogniser misheard. Delay with the filter on vs off: 7.36/7.27 s vs 7.26/7.45 s (Best).
 - **⌥⇧V** (Option-Shift-V) switches it on or off from anywhere.
 - **Waiting is visible.** With Best (and Clean), videos hold their picture until the voice arrives: the menu shows
@@ -80,7 +80,7 @@ but is no longer offered in the menu.)
   tile while the current mode keeps playing (it used to freeze the menu for ~6 s).
 - **Open at login** is in the menu; Vocalizer remembers whether it was on.
 - **Updates install themselves** (Sparkle): Vocalizer checks every 4 hours, downloads new versions in the background, verifies their signature and Developer ID, and installs when nothing is playing, then reopens as it was. Turn it off in Settings (**Install updates automatically**); right-click the menu bar icon for **Check for Updates…**.
-- Things that can't wait (games, live calls) still hear the delay. Use Speech mode for calls.
+- Things that can't wait (games, live calls) still hear the delay. Use Calls mode for those.
 - Video sync is verified for long delays too: with Supreme's ~7.2 s, Chrome held the picture for 7.1 s and Apple's
   player (Safari, QuickTime, TV) for 7.4 s before playing, then played smoothly.
 
@@ -262,7 +262,7 @@ Same 60 s of MUSDB18 songs, SDR against the true vocals:
 Real system path (loopback, sync on): measured delay 7.13 s vs 7.12 s estimated, **12.35 dB**, 0 underruns,
 GPU busy about 57 % of the time.
 
-### Speech mode (DeepFilterNet3)
+### Calls mode (DeepFilterNet3)
 
 A speech enhancement model (github.com/Rikorose/DeepFilterNet, MIT/Apache-2.0) that treats music as noise:
 48 kHz, 10 ms frames, 2 frames of look-ahead (31 ms algorithmic), about 4.5 ms of CPU per 10 ms frame for stereo.
@@ -272,9 +272,13 @@ Built from source with `cargo build --release -p deep_filter --no-default-featur
 | Same audio as above | Delay | SDR |
 |---|---|---|
 | Speech over synthetic music | 31 ms | 9.5 dB (MDX Live: 19.0) |
-| Real songs (MUSDB18) | 31 ms | 1.2 dB (MDX Live: 9.8; doing nothing: −3.8) |
+| Talking over real music (`fixtures/talk-fixture`: macOS speech over the MUSDB instrumentals, music 8 dB under the voice, 37 s) | 31 ms | 14.7 dB (Fast: 20.5, Clean: 21.0; doing nothing: 8.1) |
+| Real songs (MUSDB18) | 31 ms | 1.2 dB (Fast: 9.8; doing nothing: −3.8) |
 
-So Speech mode is for spoken content; for singing use Live (or Quality with sync on).
+So even on talking, Fast is about 6 dB cleaner (roughly four times less music left). This mode was called Speech
+until 0.3.6; it is now **Calls**, because its one advantage is the lowest delay (about 0.15 s vs 0.4 s for Fast),
+which only matters for things that can't wait: calls, games and live audio. With video sync on, videos hide Fast's
+delay anyway.
 
 ## Where it works
 
@@ -294,13 +298,13 @@ Tested on this Mac (MacBook Air, USB speakers + built-in speakers):
 | Sleep / wake | restarts the pipeline on wake (not tested here) |
 
 Not tested: AirPlay outputs (none available), Netflix/Disney+ in Safari, Firefox video sync.
-Delay can't be hidden from calls and games (use Speech mode, ~0.15 s with sync on).
+Delay can't be hidden from calls and games (use Calls mode, ~0.15 s with sync on).
 
 ## Limits found
 
 - **Delay is unavoidable, but hidden with sync on.** Without the virtual device, Live is about 0.3 s behind the source
   and lips visibly lead the voice. With **Keep video in sync**, players delay the picture to match.
-  Things that cannot be delayed (games, live calls) still hear the delay; use Speech mode for those.
+  Things that cannot be delayed (games, live calls) still hear the delay; use Calls mode for those.
 - **Small pops (fixed).** The Neural Engine occasionally takes 100–175 ms for a 20 ms call. The output buffer now
   grows by 40 ms after any dropout and fades out/in around it, so it settles without clicks; Live starts with a
   100 ms buffer (sync mode 200 ms, hidden from video).
@@ -369,6 +373,6 @@ open -W -n build/Vocalizer.app --args --selftest app:com.apple.Music 12 live $PW
   Kimberley Jensen (MIT), architecture by lucidrains / ZFTurbo, converted to Core ML here.
 - **Vocal model:** UVR MDX-Net vocals by the [Ultimate Vocal Remover](https://github.com/Anjok07/ultimatevocalremovergui)
   team (MIT, credit requested), converted to Core ML here. MDX-Net architecture by KUIELab.
-- **Speech mode:** [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) by Hendrik Schröter (MIT / Apache-2.0).
+- **Calls mode:** [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) by Hendrik Schröter (MIT / Apache-2.0).
 - **Updates:** [Sparkle](https://sparkle-project.org) (MIT).
 - Test data (not included): MUSDB18 7-second samples.

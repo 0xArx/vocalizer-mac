@@ -31,7 +31,7 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 Driver/build-driver.sh >/dev/null
 cp -R build/Vocalizer.driver "$APP/Contents/Resources/"
 # Ultra fast mode: DeepFilterNet3 (libDF built with `cargo build --release -p deep_filter --features capi`).
-# Speech mode is optional: scripts/build-deepfilter.sh builds it into .build/deepfilter.
+# Calls mode is optional: scripts/build-deepfilter.sh builds it into .build/deepfilter.
 DF=${DF_DIR:-.build/deepfilter}
 [[ -f $DF/target/release/libdf.dylib ]] || DF=../vendor/DeepFilterNet
 if [[ -f $DF/target/release/libdf.dylib ]]; then
@@ -40,7 +40,7 @@ if [[ -f $DF/target/release/libdf.dylib ]]; then
   install_name_tool -id @rpath/libdf.dylib "$APP/Contents/Frameworks/libdf.dylib" 2>/dev/null || true
   cp $DF/models/DeepFilterNet3_onnx.tar.gz "$APP/Contents/Resources/"
 else
-  echo "note: Speech mode not included (run scripts/build-deepfilter.sh first to add it)"
+  echo "note: Calls mode not included (run scripts/build-deepfilter.sh first to add it)"
 fi
 # Signing: a Developer ID identity (public releases, notarized by scripts/notarize.sh) wins over Apple Development
 # (keeps the System Audio Recording permission across local rebuilds); ad hoc when there is neither.

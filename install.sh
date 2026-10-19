@@ -5,7 +5,7 @@
 #
 # Options (after `bash -s --` when piping):
 #   --from-source   build from source instead of downloading the prebuilt app (needs Xcode or its command line tools)
-#   --with-speech   with --from-source: also build the optional Speech mode (needs Rust: brew install rust)
+#   --with-speech   with --from-source: also build the optional Calls mode (needs Rust: brew install rust)
 #   --no-driver     skip the Vocalizer audio device (no video sync; everything else works)
 #   --no-launch     don't open the app at the end
 #   --zip PATH      install from a local release zip (testing)
@@ -47,7 +47,7 @@ if [[ $FROM_SOURCE == 1 ]]; then
   say "Downloading the source"
   git clone -q --depth 1 "https://github.com/$REPO.git" "$WORK/src"
   if [[ $WITH_SPEECH == 1 ]]; then
-    say "Building Speech mode (DeepFilterNet, a few minutes the first time)"
+    say "Building Calls mode (DeepFilterNet, a few minutes the first time)"
     "$WORK/src/scripts/build-deepfilter.sh"
   fi
   say "Building Vocalizer (a minute or two)"
