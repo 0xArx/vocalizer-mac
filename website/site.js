@@ -102,26 +102,24 @@ document.documentElement.classList.add("js");
   const ins = [...document.querySelectorAll(".wave .in")];
   const out = document.querySelector(".wave .out");
   if (ins.length && out) {
-    const X0 = 240, X1 = 462, STEP = 9, MID = 515;
-    const n = Math.floor((X1 - X0) / STEP) + 1;
-    // Each tangled line is value noise: random targets per point that drift to new random targets.
-    const lines = ins.map((_, li) => ({
-      from: Array.from({ length: n }, () => Math.random() * 2 - 1),
-      to: Array.from({ length: n }, () => Math.random() * 2 - 1),
-      p: Math.random(), speed: 2.2 + li * 0.9,
-    }));
-    const ease = (u) => u * u * (3 - 2 * u);
+    const X0 = 236, X1 = 462, MID = 515;
+    // In: a messy mix, like music and a voice summed together. Several waves at unrelated
+    // frequencies beat against each other, so the shape never repeats, but it still reads as audio.
+    const mixes = ins.map((_, li) => [
+      { a: 36, f: 0.045 + li * 0.006, w: 3.1 + li },
+      { a: 26, f: 0.112 - li * 0.01, w: -5.3 },
+      { a: 16, f: 0.23 + li * 0.02, w: 7.9 - li },
+      { a: 6, f: 0.41, w: -11.7 + li * 2 },
+    ]);
     const drawLogo = (dt, t) => {
-      lines.forEach((L, li) => {
-        L.p += dt * L.speed;
-        if (L.p >= 1) { L.p -= 1; L.from = L.to; L.to = L.from.map(() => Math.random() * 2 - 1); }
-        const k = ease(L.p);
+      mixes.forEach((mix, li) => {
         let d = "";
-        for (let i = 0; i < n; i++) {
-          const x = X0 + i * STEP;
-          const env = 118 - 58 * (i / (n - 1)) ** 2;           // loud, squeezing toward the filter
-          const y = MID + env * (L.from[i] + (L.to[i] - L.from[i]) * k) * (1 - li * 0.18);
-          d += (i ? " L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+        for (let x = X0; x <= X1; x += 3) {
+          const u = (x - X0) / (X1 - X0);
+          const env = (1 - 0.45 * u * u) * (0.75 + 0.25 * Math.sin(t * 1.7 + li * 2 + u * 3)); // loud, pumping
+          let y = 0;
+          for (const c of mix) y += c.a * Math.sin(x * c.f + t * c.w + li * 1.3);
+          d += (x === X0 ? "M" : " L") + x + " " + (MID + y * env * (1 - li * 0.3)).toFixed(1);
         }
         ins[li].setAttribute("d", d);
       });
