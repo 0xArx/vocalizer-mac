@@ -32,7 +32,7 @@ curl -fsS -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: app
 curl -fsSIL -o /dev/null "$URL"
 
 python3 tools/appcast.py website/appcast.xml "$BUILD" "$VER" "$URL" "$SIG" "$NOTES"
-(cd website && npx -y vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" >/dev/null)
+(cd website && npx -y vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" >/dev/null 2>&1)
 curl -fsS https://vocalizer-mac.vercel.app/appcast.xml | grep -q "<sparkle:version>$BUILD<" && echo "appcast live: $VER ($BUILD)"
 
 git add website/appcast.xml Resources/Info.plist
