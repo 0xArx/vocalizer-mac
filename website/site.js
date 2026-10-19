@@ -105,21 +105,20 @@ document.documentElement.classList.add("js");
     const X0 = 236, X1 = 462, MID = 515;
     // In: a messy mix, like music and a voice summed together. Several waves at unrelated
     // frequencies beat against each other, so the shape never repeats, but it still reads as audio.
-    const mixes = ins.map((_, li) => [
-      { a: 36, f: 0.045 + li * 0.006, w: 3.1 + li },
-      { a: 26, f: 0.112 - li * 0.01, w: -5.3 },
-      { a: 16, f: 0.23 + li * 0.02, w: 7.9 - li },
-      { a: 6, f: 0.41, w: -11.7 + li * 2 },
+    const mixes = ins.map(() => [
+      { a: 20, f: 0.058, w: 3.4 },
+      { a: 12, f: 0.131, w: -5.1 },
+      { a: 6, f: 0.22, w: 7.3 },
     ]);
     const drawLogo = (dt, t) => {
       mixes.forEach((mix, li) => {
         let d = "";
         for (let x = X0; x <= X1; x += 3) {
           const u = (x - X0) / (X1 - X0);
-          const env = (1 - 0.45 * u * u) * (0.75 + 0.25 * Math.sin(t * 1.7 + li * 2 + u * 3)); // loud, pumping
+          const env = (1 - 0.3 * u * u) * (0.8 + 0.2 * Math.sin(t * 1.7 + u * 3)); // a little uneven
           let y = 0;
           for (const c of mix) y += c.a * Math.sin(x * c.f + t * c.w + li * 1.3);
-          d += (x === X0 ? "M" : " L") + x + " " + (MID + y * env * (1 - li * 0.3)).toFixed(1);
+          d += (x === X0 ? "M" : " L") + x + " " + (MID + y * env).toFixed(1);
         }
         ins[li].setAttribute("d", d);
       });
