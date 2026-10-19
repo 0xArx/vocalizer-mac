@@ -106,9 +106,9 @@ document.documentElement.classList.add("js");
     // In: a messy mix, like music and a voice summed together. Several waves at unrelated
     // frequencies beat against each other, so the shape never repeats, but it still reads as audio.
     const mixes = ins.map(() => [
-      { a: 20, f: 0.058, w: 3.4 },
-      { a: 12, f: 0.131, w: -5.1 },
-      { a: 6, f: 0.22, w: 7.3 },
+      { a: 32, f: 0.058, w: 3.4 },
+      { a: 19, f: 0.131, w: -5.1 },
+      { a: 9, f: 0.22, w: 7.3 },
     ]);
     const drawLogo = (dt, t) => {
       mixes.forEach((mix, li) => {
@@ -125,7 +125,7 @@ document.documentElement.classList.add("js");
       // Out: a pure sine, flowing away from the filter.
       let o = "";
       for (let x = 606; x <= 796; x += 4) {
-        const y = MID + 26 * Math.sin((x - 606) * (2 * Math.PI / 58) - t * 4.2);
+        const y = MID + 38 * Math.sin((x - 606) * (2 * Math.PI / 58) - t * 4.2);
         o += (x === 606 ? "M" : " L") + x + " " + y.toFixed(1);
       }
       out.setAttribute("d", o);
