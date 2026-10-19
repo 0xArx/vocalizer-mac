@@ -98,6 +98,57 @@ document.documentElement.classList.add("js");
     }
   }
 
+  // The logo tells the story: tangled, random sound goes in, one clean wave comes out.
+  const ins = [...document.querySelectorAll(".wave .in")];
+  const out = document.querySelector(".wave .out");
+  if (ins.length && out) {
+    const X0 = 240, X1 = 462, STEP = 9, MID = 515;
+    const n = Math.floor((X1 - X0) / STEP) + 1;
+    // Each tangled line is value noise: random targets per point that drift to new random targets.
+    const lines = ins.map((_, li) => ({
+      from: Array.from({ length: n }, () => Math.random() * 2 - 1),
+      to: Array.from({ length: n }, () => Math.random() * 2 - 1),
+      p: Math.random(), speed: 2.2 + li * 0.9,
+    }));
+    const ease = (u) => u * u * (3 - 2 * u);
+    const drawLogo = (dt, t) => {
+      lines.forEach((L, li) => {
+        L.p += dt * L.speed;
+        if (L.p >= 1) { L.p -= 1; L.from = L.to; L.to = L.from.map(() => Math.random() * 2 - 1); }
+        const k = ease(L.p);
+        let d = "";
+        for (let i = 0; i < n; i++) {
+          const x = X0 + i * STEP;
+          const env = 118 - 58 * (i / (n - 1)) ** 2;           // loud, squeezing toward the filter
+          const y = MID + env * (L.from[i] + (L.to[i] - L.from[i]) * k) * (1 - li * 0.18);
+          d += (i ? " L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+        }
+        ins[li].setAttribute("d", d);
+      });
+      // Out: a pure sine, flowing away from the filter.
+      let o = "";
+      for (let x = 606; x <= 796; x += 4) {
+        const y = MID + 26 * Math.sin((x - 606) * (2 * Math.PI / 58) - t * 4.2);
+        o += (x === 606 ? "M" : " L") + x + " " + y.toFixed(1);
+      }
+      out.setAttribute("d", o);
+    };
+    const heroBox = document.getElementById("hero");
+    if (reduce) drawLogo(0, 0);
+    else {
+      let last = 0, t = 0, live = true, id = 0;
+      const tick = (now) => {
+        const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now; t += dt;
+        drawLogo(dt, t);
+        id = live ? requestAnimationFrame(tick) : 0;
+      };
+      new IntersectionObserver(([e]) => {
+        live = e.isIntersecting;
+        if (live && !id) { last = 0; id = requestAnimationFrame(tick); }
+      }).observe(heroBox.querySelector(".logo"));
+    }
+  }
+
   // The logo's waveform only moves while the hero is on screen.
   const heroEl = document.getElementById("hero");
   if (heroEl && "IntersectionObserver" in window) {

@@ -116,9 +116,7 @@ h1, h2, h3 { font-family: var(--display); text-wrap: balance; }
 .wave .b4 { animation-duration: 1.25s; animation-delay: -0.1s; }
 .wave .b5 { animation-duration: 0.95s; animation-delay: -0.6s; }
 @keyframes speak { 0% { transform: scaleY(0.42); } 55% { transform: scaleY(1); } 100% { transform: scaleY(0.68); } }
-.wave .wig { animation: travel 1.3s linear infinite; }
-@keyframes travel { to { transform: translateX(52px); } }
-.hero.paused .wave .b, .hero.paused .wave .wig { animation-play-state: paused; }
+.hero.paused .wave .b { animation-play-state: paused; }
 .hero.music::before { opacity: 0.55; }
 h1 {
   font-size: clamp(44px, 7.4vw, 82px); line-height: 1; letter-spacing: -0.035em;
@@ -278,7 +276,7 @@ footer a { text-decoration: none; color: var(--muted); transition: color 150ms e
   @keyframes settle { from { opacity: 0; } }
   .hero .logo, .hero h1, .hero .lede, .hero .cta, .hero .meta, .demo { animation-duration: 300ms; }
   .row .bar span { transition: none; }
-  .wave .b, .wave .wig { animation: none; }
+  .wave .b { animation: none; }
   .btn:active, .ghost:active, .copy:active { transform: none; }
 }
 
