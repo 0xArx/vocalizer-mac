@@ -1,79 +1,129 @@
-// Vocalizer site: the waveform demo, the copy button, and the latest release number.
+// Vocalizer site: the hero demo, the delay scale, copy, and the latest release number.
+document.documentElement.classList.add("js");
+
 (() => {
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // Demo: a voice line with music around it. Switching on fades the music out.
+  // The demo is the page's one authored moment: it opens with the music playing, then switches
+  // itself on so the music falls away and the voice is left. Visitors can flip it back and forth.
   const canvas = document.getElementById("wave");
   const sw = document.getElementById("demo-switch");
   const label = document.getElementById("demo-label");
+  const hero = document.getElementById("hero");
   if (canvas && sw) {
     const ctx = canvas.getContext("2d");
-    let on = true, music = 0.08, t = 0, w = 0, h = 0;
+    let on = false, music = 1, t = 0, w = 0, h = 0, last = 0, visible = true, raf = 0, touched = false;
 
     const size = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       w = canvas.clientWidth; h = canvas.clientHeight;
-      canvas.width = w * dpr; canvas.height = h * dpr;
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
-    size();
-    window.addEventListener("resize", size);
 
-    // Speech-like envelope: syllables grouped into phrases with pauses.
+    // Speech-like envelope: syllables grouped into phrases with short pauses.
     const voiceEnv = (x) => {
       const phrase = Math.max(0, Math.sin(x * 0.9)) ** 0.6;
-      const syll = 0.55 + 0.45 * Math.abs(Math.sin(x * 6.3 + Math.sin(x * 2.1)));
-      return phrase * syll;
+      return phrase * (0.55 + 0.45 * Math.abs(Math.sin(x * 6.3 + Math.sin(x * 2.1))));
     };
 
     const draw = () => {
-      music += ((on ? 0.08 : 1) - music) * 0.06;
       ctx.clearRect(0, 0, w, h);
       const mid = h / 2, bars = Math.max(48, Math.floor(w / 7)), bw = w / bars;
 
-      // Music: steady wide bars (drums and chords), grey.
-      ctx.fillStyle = `rgba(110, 102, 128, ${0.25 + 0.55 * music})`;
-      for (let i = 0; i < bars; i++) {
-        const x = i * bw;
-        const beat = 0.55 + 0.45 * Math.abs(Math.sin((i + t * 9) * 0.55));
-        const chord = 0.6 + 0.4 * Math.sin(i * 0.21 + t * 1.3);
-        const a = (h * 0.42) * beat * chord * music;
-        ctx.fillRect(x + 1, mid - a, Math.max(1, bw - 3), a * 2);
+      // Music: wide, steady bars (drums and chords), sinking into the floor when filtered.
+      if (music > 0.01) {
+        ctx.fillStyle = `rgba(120, 110, 140, ${0.22 + 0.5 * music})`;
+        for (let i = 0; i < bars; i++) {
+          const beat = 0.55 + 0.45 * Math.abs(Math.sin((i + t * 9) * 0.55));
+          const chord = 0.6 + 0.4 * Math.sin(i * 0.21 + t * 1.3);
+          const a = h * 0.42 * beat * chord * music;
+          ctx.fillRect(i * bw + 1, mid - a, Math.max(1, bw - 3), a * 2);
+        }
       }
 
-      // Voice: a smooth gradient waveform that always stays.
+      // Voice: one continuous line that is always there; it brightens as the music leaves.
+      const clarity = 1 - music;
       const g = ctx.createLinearGradient(0, 0, w, 0);
-      g.addColorStop(0, "#7c3aed"); g.addColorStop(0.5, "#a96bff"); g.addColorStop(1, "#e3c4ff");
-      ctx.strokeStyle = g; ctx.lineWidth = 2.4; ctx.lineJoin = "round";
+      g.addColorStop(0, "#7c3aed"); g.addColorStop(0.5, "#a96bff"); g.addColorStop(1, "#dcc0ff");
+      ctx.save();
+      ctx.globalAlpha = 0.55 + 0.45 * clarity;
+      ctx.shadowColor = "rgba(160, 100, 255, 0.8)";
+      ctx.shadowBlur = 12 * clarity;
+      ctx.strokeStyle = g; ctx.lineWidth = 2.2 + 0.6 * clarity; ctx.lineJoin = "round";
       ctx.beginPath();
       for (let x = 0; x <= w; x += 2) {
-        const u = x / w * 9 + t * 1.6;
+        const u = (x / w) * 9 + t * 1.6;
         const amp = h * 0.36 * voiceEnv(u);
         const y = mid + amp * Math.sin(x * 0.11 + t * 14) * Math.sin(x * 0.023 + t * 3);
         x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
-
-      if (!reduce) { t += 0.006; requestAnimationFrame(draw); }
+      ctx.restore();
     };
-    draw();
 
-    sw.addEventListener("click", () => {
-      on = !on;
+    const frame = (now) => {
+      const dt = Math.min(0.05, (now - (last || now)) / 1000);
+      last = now;
+      // Exponential approach: fast at first, settling gently, and reversible mid-way.
+      music += ((on ? 0 : 1) - music) * (1 - Math.exp(-dt / 0.32));
+      t += dt * 0.36;
+      draw();
+      raf = visible ? requestAnimationFrame(frame) : 0;
+    };
+
+    const set = (value) => {
+      on = value;
       sw.setAttribute("aria-checked", String(on));
       label.textContent = on ? "Vocalizer on" : "Vocalizer off";
-      if (reduce) { music = on ? 0.08 : 1; draw(); }
-    });
+      hero.classList.toggle("music", !on);
+      if (reduce) { music = on ? 0 : 1; draw(); }
+    };
+
+    size();
+    window.addEventListener("resize", () => { size(); if (reduce) draw(); });
+    sw.addEventListener("click", () => { touched = true; set(!on); });
+
+    if (reduce) {
+      set(true);
+    } else {
+      draw();
+      // Only animate while the demo is on screen.
+      new IntersectionObserver(([e]) => {
+        visible = e.isIntersecting;
+        if (visible && !raf) { last = 0; raf = requestAnimationFrame(frame); }
+      }).observe(canvas);
+      // Let the visitor see the music for a beat, then switch Vocalizer on.
+      setTimeout(() => { if (!touched) set(true); }, 1600);
+    }
+  }
+
+  // The logo's waveform only moves while the hero is on screen.
+  const heroEl = document.getElementById("hero");
+  if (heroEl && "IntersectionObserver" in window) {
+    new IntersectionObserver(([e]) => heroEl.classList.toggle("paused", !e.isIntersecting)).observe(heroEl);
+  }
+
+  // The delay scale draws its bars when it comes into view.
+  const scale = document.getElementById("scale");
+  if (scale) {
+    if (reduce || !("IntersectionObserver" in window)) scale.classList.add("drawn");
+    else {
+      const io = new IntersectionObserver(([e]) => {
+        if (e.isIntersecting) { scale.classList.add("drawn"); io.disconnect(); }
+      }, { rootMargin: "0px 0px -80px 0px" });
+      io.observe(scale);
+      setTimeout(() => { if (scale.getBoundingClientRect().top < innerHeight) scale.classList.add("drawn"); }, 2500);
+    }
   }
 
   // Copy the install command.
   const copy = document.getElementById("copy");
   if (copy) {
     copy.addEventListener("click", async () => {
-      const text = document.getElementById("cmd").textContent;
-      try { await navigator.clipboard.writeText(text); copy.textContent = "Copied"; }
-      catch { copy.textContent = "Select and copy"; }
-      setTimeout(() => (copy.textContent = "Copy"), 1800);
+      try { await navigator.clipboard.writeText(document.getElementById("cmd").textContent); copy.textContent = "Copied"; }
+      catch { copy.textContent = "Select it"; }
+      setTimeout(() => (copy.textContent = "Copy"), 1600);
     });
   }
 
@@ -85,26 +135,7 @@
       const v = rel.tag_name.replace(/^v/, "");
       document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "Version " + v));
       const asset = (rel.assets || []).find((a) => a.name === "Vocalizer-macOS.zip");
-      if (asset) {
-        const mb = Math.round(asset.size / 1e6);
-        document.querySelectorAll("[data-size]").forEach((el) => (el.textContent = mb + " MB"));
-      }
+      if (asset) document.querySelectorAll("[data-size]").forEach((el) => (el.textContent = Math.round(asset.size / 1e6) + " MB"));
     })
     .catch(() => {});
-})();
-
-// Reveal blocks as they scroll into view, staggered within each grid.
-(() => {
-  const els = document.querySelectorAll(".reveal");
-  document.querySelectorAll(".grid, .modes, .steps").forEach((g) =>
-    [...g.children].forEach((c, i) => c.style.setProperty("--d", (i % 3) * 0.08 + "s")));
-  if (!("IntersectionObserver" in window)) { els.forEach((e) => e.classList.add("in")); return; }
-  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
-    if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
-  }), { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
-  els.forEach((e) => io.observe(e));
-  // Safety net: anything already on screen after a moment is shown even if the observer never fired.
-  setTimeout(() => els.forEach((e) => {
-    if (e.getBoundingClientRect().top < window.innerHeight) e.classList.add("in");
-  }), 1500);
 })();
