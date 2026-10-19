@@ -15,8 +15,8 @@ SPARKLE=${SPARKLE_BIN:-$HOME/Developer/vendor/sparkle-2.10.0/bin}
 if [[ ! -x $SPARKLE/sign_update ]]; then
   mkdir -p "$SPARKLE/.." && curl -fsSL https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz | tar -xJ -C "$SPARKLE/.."
 fi
-curl -fsS -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/$REPO/releases/tags/v$VER | grep -q 404 \
-  || { echo "error: v$VER is already released; bump CFBundleShortVersionString and CFBundleVersion first"; exit 1; }
+CODE=$(curl -sS -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/$REPO/releases/tags/v$VER)
+[[ $CODE == 404 ]] || { echo "error: v$VER is already released (HTTP $CODE); bump CFBundleShortVersionString and CFBundleVersion first"; exit 1; }
 
 scripts/package-release.sh
 ZIP=build/Vocalizer-macOS.zip
