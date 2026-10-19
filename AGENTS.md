@@ -94,7 +94,11 @@ Driver/build-driver.sh          # audio device -> build/Vocalizer.driver; script
 swift build -c release && .build/release/vocalizer-bench Models fixtures/musdb-fixture all presets  # offline quality/speed
 ```
 
-Releases (maintainer only): `scripts/package-release.sh` signs with the Developer ID identity in the keychain
+Releases (maintainer only): bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist`, then
+`scripts/publish.sh "one change per line"` does everything: build, Developer ID signing, notarization, the Sparkle
+EdDSA signature (`.signing/sparkle-private.key`), the GitHub release, `website/appcast.xml`, and the deploy. Bump
+`Driver/Info.plist` `CFBundleVersion` only when the driver changes (installed apps then offer to update it).
+Under the hood `scripts/package-release.sh` signs with the Developer ID identity in the keychain
 (hardened runtime, `Resources/Vocalizer.entitlements`), notarizes with the `vocalizer` notarytool keychain profile
 (`scripts/notarize.sh`), staples, and writes `build/Vocalizer-macOS.zip`. Without a Developer ID it builds an
 unnotarized zip and says so. `HARDENED=1 scripts/build-app.sh` tests the release signing with a development identity.

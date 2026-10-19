@@ -1,5 +1,5 @@
 // Right-click (or Control-click) on the Vocalizer icon in the menu bar: a small native menu with the
-// version, Uninstall and Quit. A left click still opens the normal Vocalizer panel.
+// version, Check for Updates, Uninstall and Quit. A left click still opens the normal Vocalizer panel.
 // SwiftUI's MenuBarExtra has no secondary-click menu, so we catch the click on our own status item window.
 
 import AppKit
@@ -8,9 +8,11 @@ import AppKit
 final class StatusMenu: NSObject {
     private var monitor: Any?
     private let uninstall: () -> Void
+    private let checkForUpdates: () -> Void
 
-    init(uninstall: @escaping () -> Void) {
+    init(uninstall: @escaping () -> Void, checkForUpdates: @escaping () -> Void) {
         self.uninstall = uninstall
+        self.checkForUpdates = checkForUpdates
         super.init()
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown]) { [weak self] event in
             guard let self, let window = event.window,
@@ -29,6 +31,9 @@ final class StatusMenu: NSObject {
         title.isEnabled = false
         menu.addItem(title)
         menu.addItem(.separator())
+        let check = NSMenuItem(title: "Check for Updates…", action: #selector(checkClicked), keyEquivalent: "")
+        check.target = self
+        menu.addItem(check)
         let remove = NSMenuItem(title: "Uninstall Vocalizer…", action: #selector(uninstallClicked), keyEquivalent: "")
         remove.target = self
         menu.addItem(remove)
@@ -40,4 +45,5 @@ final class StatusMenu: NSObject {
     }
 
     @objc private func uninstallClicked() { uninstall() }
+    @objc private func checkClicked() { checkForUpdates() }
 }

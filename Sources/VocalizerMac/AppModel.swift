@@ -110,6 +110,18 @@ final class AppModel: ObservableObject {
         }
     }
     @Published private(set) var driverInstalled = AudioProcesses.vocalizerDevice() != nil
+    /// The installed audio device is older than the one inside this app (its CFBundleVersion is bumped only
+    /// when the driver itself changes, so updates rarely need the password).
+    @Published private(set) var driverOutdated = AppModel.checkDriverOutdated()
+
+    static func checkDriverOutdated() -> Bool {
+        func version(_ url: URL) -> Int? {
+            (NSDictionary(contentsOf: url.appendingPathComponent("Contents/Info.plist"))?["CFBundleVersion"] as? String).flatMap(Int.init)
+        }
+        guard let bundled = Bundle.main.url(forResource: "Vocalizer", withExtension: "driver").flatMap(version),
+              let installed = version(URL(fileURLWithPath: "/Library/Audio/Plug-Ins/HAL/Vocalizer.driver")) else { return false }
+        return installed < bundled
+    }
     /// Optional swear-word filter (Apple's on-device speech recognition). Adds no delay.
     @Published var muteSwearWords = UserDefaults.standard.bool(forKey: "muteSwearWords") {
         didSet {
@@ -222,12 +234,19 @@ final class AppModel: ObservableObject {
                 guard let self, self.ready else { return }
                 self.enabled.toggle()
             }
-            statusMenu = StatusMenu { [weak self] in self?.uninstall() }
+            statusMenu = StatusMenu(uninstall: { [weak self] in self?.uninstall() },
+                                    checkForUpdates: { [weak self] in self?.updater.checkForUpdates() })
             uninstaller = Uninstaller(
                 uninstall: { [weak self] in self?.uninstall() },
                 movedToTrash: { [weak self] in self?.uninstall(inTrash: true) })
             updaterSink = updater.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
-            updater.checkSoon()
+            // Install updates only when it interrupts nothing: off, or no sound for a minute.
+            updater.isIdle = { [weak self] in
+                guard let self else { return true }
+                if !self.enabled { return true }
+                guard let quiet = self.silentSince else { return false }
+                return Date().timeIntervalSince(quiet) > 60
+            }
             DispatchQueue.main.async { WelcomeWindow.showIfFirstLaunch(model: self) }
         }
 
@@ -598,6 +617,7 @@ final class AppModel: ObservableObject {
         if let err { error = (err[NSAppleScript.errorMessage] as? String) ?? "Install cancelled"; return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.driverInstalled = AudioProcesses.vocalizerDevice() != nil
+            self?.driverOutdated = AppModel.checkDriverOutdated()
             if self?.enabled == true { self?.apply() }
         }
     }

@@ -21,6 +21,10 @@ for f in 32 64 256; do
     cp -R Models/MDXVocals$f.mlpackage "$APP/Contents/Resources/"
   fi
 done
+# Sparkle (updates). Not sandboxed, so its XPC services aren't needed (Sparkle docs: sandboxing only).
+mkdir -p "$APP/Contents/Frameworks"
+ditto .build/release/Sparkle.framework "$APP/Contents/Frameworks/Sparkle.framework"
+rm -rf "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" "$APP/Contents/Frameworks/Sparkle.framework/XPCServices"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # Sync-video driver (installed from the menu, or with scripts/install-driver.sh).
@@ -48,6 +52,8 @@ if [[ $SIGN_ID == "Developer ID"* || -n ${HARDENED:-} ]]; then   # HARDENED=1: t
   # Inside out (the driver was signed by build-driver.sh), hardened runtime, secure timestamp: what notarization needs.
   SIGN=(codesign --force --options runtime --timestamp --sign "$SIGN_ID")
   [[ -f $APP/Contents/Frameworks/libdf.dylib ]] && $SIGN "$APP/Contents/Frameworks/libdf.dylib"
+  SP="$APP/Contents/Frameworks/Sparkle.framework"
+  $SIGN "$SP/Versions/B/Autoupdate"; $SIGN "$SP/Versions/B/Updater.app"; $SIGN "$SP"
   $SIGN --entitlements Resources/Vocalizer.entitlements "$APP"
   codesign --verify --strict --deep "$APP"
 else

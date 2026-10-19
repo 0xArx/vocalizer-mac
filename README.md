@@ -79,7 +79,7 @@ but is no longer offered in the menu.)
   each time sound starts again (a new video, play, or seeking). Best loads in the background with a spinner on its
   tile while the current mode keeps playing (it used to freeze the menu for ~6 s).
 - **Open at login** is in the menu; Vocalizer remembers whether it was on.
-- When a new version is out, the menu shows **Update**: one click runs the installer and reopens the app.
+- **Updates install themselves** (Sparkle): Vocalizer checks every 4 hours, downloads new versions in the background, verifies their signature and Developer ID, and installs when nothing is playing, then reopens as it was. Turn it off in Settings (**Install updates automatically**); right-click the menu bar icon for **Check for Updates…**.
 - Things that can't wait (games, live calls) still hear the delay. Use Speech mode for calls.
 - Video sync is verified for long delays too: with Supreme's ~7.2 s, Chrome held the picture for 7.1 s and Apple's
   player (Safari, QuickTime, TV) for 7.4 s before playing, then played smoothly.
@@ -87,8 +87,8 @@ but is no longer offered in the menu.)
 ## Privacy
 
 Everything runs locally. Audio is never recorded to disk or sent anywhere. The app makes only two kinds of
-network requests, both to GitHub: a version check once a day (the latest release number), and the one-time
-download of the Supreme model when you click **Download** in Supreme mode.
+network requests: the update check every 4 hours (a small file on the Vocalizer website) and downloads from GitHub
+(new versions, and the Best model when you click **Download**).
 
 ## How it works
 
@@ -323,4 +323,5 @@ open -W -n build/Vocalizer.app --args --selftest app:com.apple.Music 12 live $PW
 - **Vocal model:** UVR MDX-Net vocals by the [Ultimate Vocal Remover](https://github.com/Anjok07/ultimatevocalremovergui)
   team (MIT, credit requested), converted to Core ML here. MDX-Net architecture by KUIELab.
 - **Speech mode:** [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) by Hendrik Schröter (MIT / Apache-2.0).
+- **Updates:** [Sparkle](https://sparkle-project.org) (MIT).
 - Test data (not included): MUSDB18 7-second samples.
