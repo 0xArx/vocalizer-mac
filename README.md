@@ -90,6 +90,53 @@ Everything runs locally. Audio is never recorded to disk or sent anywhere. The a
 network requests: the update check every 4 hours (a small file on the Vocalizer website) and downloads from GitHub
 (new versions, and the Best model when you click **Download**).
 
+## Updates and security
+
+Vocalizer updates itself with [Sparkle](https://sparkle-project.org): it checks every 4 hours, downloads new
+versions in the background, and installs them when nothing is playing (Vocalizer off, or a minute of silence), then
+reopens as it was. Turn this off in Settings (**Install updates automatically**). Right-click the menu bar icon for
+**Check for Updates…**. Every release and its changes are listed on the
+[releases page](https://github.com/0xArx/vocalizer-mac/releases).
+
+**What a safe auto-update can and can't prove.** It proves an update came from the same developer and wasn't
+changed along the way. It can't prove the developer means well, so turning on automatic updates means trusting the
+developer to keep behaving and to keep their keys safe. That is true of every app that updates itself, App Store
+apps included.
+
+**What protects you with Vocalizer's updates:**
+
+| Risk | Protection |
+|---|---|
+| Someone hacks the website or GitHub and uploads a fake update | Refused. Every update must carry an EdDSA signature made with a private key that only exists on the developer's Mac; the app checks it against the public key built into it. A hacked server can't produce that signature. |
+| Someone tampers with the download along the way | Refused. Changing a single byte breaks the signature. (Tested: a tampered update was downloaded and rejected.) |
+| Someone builds a lookalike app | Refused. The update must also be signed with the same Apple Developer ID as the installed app. |
+| The update contains known malware | Apple scans every release before notarizing it, and can revoke the certificate, which blocks the app on every Mac. |
+| A bad change hidden in the code | The project is open source: every change is public in this repository. |
+
+**What none of this stops:** the developer, or the developer's keys, going bad. Someone holding the update signing
+key, the Developer ID and the notarization key could ship a malicious update that installs itself. This kind of
+attack on trusted software is rare but real, which is why those keys are kept offline and out of this repository.
+
+**What a bad update could and couldn't do on your Mac:**
+- It would keep the permission Vocalizer already has, System Audio Recording, so in theory it could listen to what
+  your Mac plays.
+- It couldn't quietly get new permissions. Camera, microphone, contacts, location, screen recording and your
+  Documents and Desktop folders each make macOS ask you first. A new request from an app you already use is a
+  warning sign.
+- It could connect to the internet without asking, because macOS doesn't block outgoing connections by default. A
+  free, open-source firewall like [LuLu](https://objective-see.org/products/lulu.html) shows you when an app
+  connects somewhere and lets you block it. Vocalizer itself only ever contacts `vocalizer-mac.vercel.app`
+  (the update list) and `github.com` (downloads).
+
+**Checking which of your apps update themselves:**
+- App Store apps: App Store › Settings › **Automatic Updates**.
+- Apps with their own updater: look in the app's settings for "Automatically check for updates" or "Automatically
+  download and install" (in Vocalizer: Settings › **Install updates automatically**).
+- Background updaters (Google, Microsoft, Zoom and others): System Settings › General › **Login Items &
+  Extensions** › Allow in the Background. These run even when the app isn't open.
+
+Found a security problem? See [SECURITY.md](SECURITY.md).
+
 ## How it works
 
 ```
