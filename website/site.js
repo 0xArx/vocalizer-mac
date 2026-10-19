@@ -134,8 +134,8 @@ document.documentElement.classList.add("js");
       out.setAttribute("d", o);
     };
     const heroBox = document.getElementById("hero");
-    if (reduce) drawLogo(0, 0);
-    else {
+    drawLogo(0, 0); // a real first frame right away, even before animation starts
+    if (!reduce) {
       let last = 0, t = 0, live = true, id = 0;
       const tick = (now) => {
         const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now; t += dt;
