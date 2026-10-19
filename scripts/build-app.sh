@@ -53,7 +53,7 @@ if [[ $SIGN_ID == "Developer ID"* || -n ${HARDENED:-} ]]; then   # HARDENED=1: t
 else
   codesign --force --deep --sign "$SIGN_ID" "$APP" 2>&1 | grep -v "replacing existing signature" || true
 fi
-codesign -dv "$APP" 2>&1 | grep -E "Identifier|Authority=(Apple Development|Developer ID Application)|Signature=adhoc|runtime" || true
+codesign -dvv "$APP" 2>&1 | grep -E "Identifier|Authority=(Apple Development|Developer ID Application)|Signature=adhoc|runtime" || true
 echo "built $APP"
 # --install: copy this build over /Applications/Vocalizer.app.
 if [[ "${1:-}" == "--install" ]]; then

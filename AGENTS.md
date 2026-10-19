@@ -92,6 +92,11 @@ Driver/build-driver.sh          # audio device -> build/Vocalizer.driver; script
 swift build -c release && .build/release/vocalizer-bench Models fixtures/musdb-fixture all presets  # offline quality/speed
 ```
 
+Releases (maintainer only): `scripts/package-release.sh` signs with the Developer ID identity in the keychain
+(hardened runtime, `Resources/Vocalizer.entitlements`), notarizes with the `vocalizer` notarytool keychain profile
+(`scripts/notarize.sh`), staples, and writes `build/Vocalizer-macOS.zip`. Without a Developer ID it builds an
+unnotarized zip and says so. `HARDENED=1 scripts/build-app.sh` tests the release signing with a development identity.
+
 Layout:
 
 | Path | What |

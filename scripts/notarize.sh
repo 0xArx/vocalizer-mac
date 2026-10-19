@@ -7,7 +7,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 APP=build/Vocalizer.app
 PROFILE=${NOTARY_PROFILE:-vocalizer}
-codesign -dv "$APP" 2>&1 | grep -q "Authority=Developer ID Application" \
+# (read into a variable first: with pipefail, grep -q closing the pipe early would fail codesign)
+SIG=$(codesign -dvv "$APP" 2>&1)
+[[ $SIG == *"Authority=Developer ID Application"* ]] \
   || { echo "error: $APP is not signed with a Developer ID Application certificate"; exit 1; }
 ZIP=build/Vocalizer-notarize.zip
 rm -f "$ZIP"; ditto -c -k --keepParent "$APP" "$ZIP"

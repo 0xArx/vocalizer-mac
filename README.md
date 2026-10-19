@@ -34,8 +34,8 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 - **Build from source** (needs Xcode or `xcode-select --install`):
   `curl -fsSL .../install.sh | bash -s -- --from-source` (add `--with-speech` for Speech mode; needs `brew install rust`)
 - **Manually:** download `Vocalizer-macOS.zip` from [Releases](https://github.com/0xArx/vocalizer-mac/releases),
-  move `Vocalizer.app` to Applications, open it, and use **Install…** in its menu for the audio device. Because the app
-  is not notarized yet, macOS may block the first launch: System Settings › Privacy & Security › **Open Anyway**.
+  move `Vocalizer.app` to Applications, open it, and use **Install…** in its menu for the audio device. The app is
+  signed with a Developer ID and notarized by Apple, so it opens with no warning.
 - **For development:** `git clone`, then `scripts/build-app.sh --install` (see [AGENTS.md](AGENTS.md)).
 
 </details>
@@ -267,7 +267,6 @@ Delay can't be hidden from calls and games (use Speech mode, ~0.15 s with sync o
   beyond that restart.
 - *All audio* also captures system sounds and notifications and runs them through the model.
 - System volume applies to Vocalizer's output as normal.
-- Not notarized; it is a local prototype.
 
 ## Files
 
