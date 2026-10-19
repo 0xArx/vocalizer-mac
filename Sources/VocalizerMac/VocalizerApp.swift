@@ -12,7 +12,7 @@ struct VocalizerApp: App {
             if model.preparing != nil || model.catchUpSeconds != nil {
                 Image(systemName: Int(Date().timeIntervalSince1970 * 2) % 2 == 0 ? "hourglass.tophalf.filled" : "hourglass.bottomhalf.filled")
             } else {
-                Image(systemName: model.enabled ? "music.mic.circle.fill" : "music.mic")
+                Image(nsImage: MenuIcon.image(on: model.enabled))
             }
         }
         .menuBarExtraStyle(.window)

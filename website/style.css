@@ -221,6 +221,7 @@ details::details-content { height: 0; overflow: clip; transition: height 280ms v
 details[open]::details-content { height: auto; }
 details p { color: var(--muted); margin: 0 0 22px; max-width: 68ch; }
 a.inline { color: var(--lav); }
+details p b { color: var(--text); font-weight: 600; }
 
 /* Final CTA */
 .final { text-align: center; padding: 120px 0 128px; }

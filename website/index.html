@@ -154,7 +154,7 @@
       <p class="sub">Requires a Mac with Apple silicon (M1 or later) and macOS 14.2 or later.</p>
       <ol class="steps">
         <li class="step"><h3>Download</h3><p>Download the zip and open it. Drag <b>Vocalizer</b> to your Applications folder.</p></li>
-        <li class="step"><h3>Open it</h3><p>Vocalizer lives in the menu bar. For video sync, click <b>Install</b> in its menu and enter your password once.</p></li>
+        <li class="step"><h3>Open it</h3><p>Vocalizer lives in the menu bar as its waveform logo. For video sync, click <b>Install</b> in its menu and enter your password once.</p></li>
         <li class="step"><h3>Switch it on</h3><p>Flip the switch, then click <b>Allow</b> when macOS asks about System Audio Recording. Play something.</p></li>
       </ol>
     </div>
@@ -178,7 +178,7 @@
           </div>
         </details>
         <details><summary>Does it work on Intel Macs?</summary><p>No. Vocalizer needs Apple silicon (M1 or later), because it runs its models on the Neural Engine and GPU.</p></details>
-        <details><summary>How do I uninstall it?</summary><p>Quit Vocalizer from its menu and drag it to the Trash. To also remove the video sync device, run <code>curl -fsSL https://vocalizer-mac.vercel.app/uninstall.sh | bash</code>.</p></details>
+        <details><summary>How do I uninstall it?</summary><p>Right-click Vocalizer in your Applications folder and choose <b>Services › Uninstall Vocalizer</b>, or just drag it to the Bin and Vocalizer offers to clean up after itself. You can also right-click its icon in the menu bar. It removes the app, its audio device, the downloaded models and its settings, and puts your speakers back to normal. From the Terminal you can also run <code>curl -fsSL https://vocalizer-mac.vercel.app/uninstall.sh | bash</code>.</p></details>
       </div>
     </div>
   </section>

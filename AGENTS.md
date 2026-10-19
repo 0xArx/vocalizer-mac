@@ -42,7 +42,7 @@ Options (pass after `bash -s --`, e.g. `curl ... | bash -s -- --no-driver`):
 2. **System Audio Recording permission.** The first time they switch Vocalizer on, macOS asks to allow
    *System Audio Recording*. They must click **Allow**. If they missed it: System Settings › Privacy & Security ›
    Screen & System Audio Recording › turn on **Vocalizer**.
-3. **Switch it on.** Click the microphone icon in the menu bar and flip the switch. Mode **Fast** is the default
+3. **Switch it on.** Click the Vocalizer icon (a waveform in a circle) in the menu bar and flip the switch. Mode **Fast** is the default
    (modes in the menu: Fast, Clean, Best, Speech = `live`, `quality`, `supreme`, `ultra` in code).
    **Best** (~7 s delay hidden by video sync) needs a one-time 400 MB download: the user clicks **Download** in the
    menu, or run `/Applications/Vocalizer.app/Contents/MacOS/Vocalizer --download-supreme`.
@@ -67,6 +67,8 @@ The self-test must run inside the app bundle (via `open`): a bare command line p
 app bundles can hold the System Audio Recording permission.
 
 ### 5. Uninstall
+
+In Finder: right-click Vocalizer in Applications › **Services › Uninstall Vocalizer**, or drag it to the Bin (it offers to remove the rest). Or right-click the menu bar icon › **Uninstall Vocalizer…**. `VOCALIZER_UNINSTALL_DRYRUN=1` makes uninstall only log (for testing). Or from the Terminal:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash

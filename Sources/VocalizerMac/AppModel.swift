@@ -222,6 +222,10 @@ final class AppModel: ObservableObject {
                 guard let self, self.ready else { return }
                 self.enabled.toggle()
             }
+            statusMenu = StatusMenu { [weak self] in self?.uninstall() }
+            uninstaller = Uninstaller(
+                uninstall: { [weak self] in self?.uninstall() },
+                movedToTrash: { [weak self] in self?.uninstall(inTrash: true) })
             updaterSink = updater.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
             updater.checkSoon()
             DispatchQueue.main.async { WelcomeWindow.showIfFirstLaunch(model: self) }
@@ -261,6 +265,8 @@ final class AppModel: ObservableObject {
 
     private var listeners: [AudioObjectPropertyListenerBlock] = []
     private var hotKey: HotKey?
+    private var statusMenu: StatusMenu?
+    private var uninstaller: Uninstaller?
     let updater = Updater()
     private var updaterSink: AnyCancellable?
     private var activeRealUID: String?
@@ -593,6 +599,63 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.driverInstalled = AudioProcesses.vocalizerDevice() != nil
             if self?.enabled == true { self?.apply() }
+        }
+    }
+
+    /// Removes Vocalizer completely: the audio device (macOS asks for the password), downloaded models,
+    /// settings, the login item and the audio permission, then moves the app to the Trash and quits.
+    /// `inTrash`: the user already dragged the app to the Bin; offer to finish the job.
+    func uninstall(inTrash: Bool = false) {
+        // Test hook: report instead of removing anything.
+        if ProcessInfo.processInfo.environment["VOCALIZER_UNINSTALL_DRYRUN"] != nil {
+            NSLog("Vocalizer: uninstall requested (inTrash: %@), dry run", inTrash ? "yes" : "no")
+            NSApp.terminate(nil); return
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = inTrash ? "Vocalizer is in the Bin. Remove the rest too?" : "Uninstall Vocalizer?"
+        alert.informativeText = inTrash
+            ? "Also remove its audio device, the downloaded models and its settings, so nothing is left behind. Your speakers go back to normal. macOS asks for your password to remove the audio device."
+            : "This removes Vocalizer, its audio device, the downloaded models and its settings. Your speakers go back to normal. macOS asks for your password to remove the audio device."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: inTrash ? "Remove Everything" : "Uninstall")
+        alert.addButton(withTitle: inTrash ? "Just Quit" : "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            if inTrash { NSApp.terminate(nil) }
+            return
+        }
+
+        // Stop and give the speakers back first, so nothing is left routed through the device.
+        enabled = false
+        engine.stop()
+        restoreRealOutput()
+        try? SMAppService.mainApp.unregister()
+
+        let driver = "/Library/Audio/Plug-Ins/HAL/Vocalizer.driver"
+        if FileManager.default.fileExists(atPath: driver) {
+            let script = "do shell script \"rm -rf '\(driver)' && killall coreaudiod\" with administrator privileges with prompt \"Vocalizer wants to remove its audio device.\""
+            var err: NSDictionary?
+            NSAppleScript(source: script)?.executeAndReturnError(&err)
+            if err != nil {
+                error = "Uninstall stopped: the audio device was not removed (password dialog cancelled)."
+                return
+            }
+        }
+        let fm = FileManager.default
+        if let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            try? fm.removeItem(at: support.appendingPathComponent("Vocalizer"))
+        }
+        if let id = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: id)
+            let reset = Process()
+            reset.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+            reset.arguments = ["reset", "AudioCapture", id]
+            try? reset.run(); reset.waitUntilExit()
+        }
+        if inTrash { NSApp.terminate(nil); return }
+        NSWorkspace.shared.recycle([Bundle.main.bundleURL]) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
         }
     }
 

@@ -103,6 +103,45 @@ if let i = args.firstIndex(of: "--snapshot-hud"), args.count > i + 1 {
     }
     app.run()
 }
+// Renders the menu bar icon (off and on) large, on light and dark, to check the drawing.
+if let i = args.firstIndex(of: "--menu-icon-check"), args.count > i + 1 {
+    let scale: CGFloat = 10, w: CGFloat = 18 * scale
+    let out = NSImage(size: NSSize(width: w * 4, height: w), flipped: false) { _ in
+        for (k, (on, dark)) in [(false, false), (true, false), (false, true), (true, true)].enumerated() {
+            let cell = NSRect(x: CGFloat(k) * w, y: 0, width: w, height: w)
+            (dark ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.93, alpha: 1)).setFill(); cell.fill()
+            let icon = MenuIcon.image(on: on)
+            let tinted = NSImage(size: icon.size, flipped: false) { r in
+                icon.draw(in: r)
+                (dark ? NSColor.white : NSColor.black).set()
+                r.fill(using: .sourceAtop)
+                return true
+            }
+            tinted.draw(in: cell.insetBy(dx: 0, dy: 0))
+        }
+        return true
+    }
+    if let tiff = out.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: args[i + 1]))
+    }
+    // Actual size on a Retina menu bar (36 px), side by side.
+    let real = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 36 * 4, pixelsHigh: 36, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    real.size = NSSize(width: 18 * 4, height: 18)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: real)
+    for (k, (on, dark)) in [(false, false), (true, false), (false, true), (true, true)].enumerated() {
+        let cell = NSRect(x: CGFloat(k) * 18, y: 0, width: 18, height: 18)
+        (dark ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.93, alpha: 1)).setFill(); cell.fill()
+        let icon = MenuIcon.image(on: on)
+        let tinted = NSImage(size: icon.size, flipped: false) { r in
+            icon.draw(in: r); (dark ? NSColor.white : NSColor.black).set(); r.fill(using: .sourceAtop); return true
+        }
+        tinted.draw(in: cell)
+    }
+    NSGraphicsContext.restoreGraphicsState()
+    try? real.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: args[i + 1] + ".real.png"))
+    exit(0)
+}
 // Checks the menu window follows its content: starts too tall (the old bug), then unfolds and folds Settings.
 if let i = args.firstIndex(of: "--menu-fit-check"), args.count > i + 1 {
     let app = NSApplication.shared
@@ -123,6 +162,10 @@ if let i = args.firstIndex(of: "--menu-fit-check"), args.count > i + 1 {
             defaults.set(true, forKey: "showSettings")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 log.append("open \(Int(h()))")
+                if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                    host.cacheDisplay(in: host.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: args[i + 1] + ".open.png"))
+                }
                 defaults.set(false, forKey: "showSettings")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                     log.append("closed again \(Int(h()))")

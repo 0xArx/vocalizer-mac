@@ -17,7 +17,8 @@ Short version:
 3. **Tell the user** (these need them, not you):
    - type their Mac password in the macOS dialog that installs the audio device (never ask for it in chat);
    - click **Allow** when macOS asks for *System Audio Recording* the first time they switch it on;
-   - click the microphone icon in the menu bar and flip the switch (Live mode is the default).
+   - click the Vocalizer icon (a waveform in a circle) in the menu bar and flip the switch (Fast mode is the default).
+   - to remove it later: right-click Vocalizer in Applications › Services › Uninstall Vocalizer (or drag it to the Bin)
 4. **Verify:** `pgrep -lf /Applications/Vocalizer.app` and `system_profiler SPAudioDataType | grep -A3 "Vocalizer:"`.
 5. **Uninstall:** `curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash`
 

@@ -88,7 +88,7 @@ if [[ $DRIVER == 1 ]]; then
   fi
 fi
 
-say "Installed. Vocalizer lives in the menu bar (microphone icon)."
+say "Installed. Vocalizer lives in the menu bar (a waveform in a circle)."
 echo "    First time you switch it on, macOS asks to allow System Audio Recording: click Allow."
 echo "    Uninstall: curl -fsSL https://raw.githubusercontent.com/$REPO/main/uninstall.sh | bash"
 [[ $LAUNCH == 1 ]] && open "$APP_DEST"

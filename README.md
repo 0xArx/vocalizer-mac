@@ -21,7 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/install.sh
 That downloads the latest release, puts **Vocalizer** in Applications, installs the Vocalizer audio device (macOS
 asks for your password once) and opens the app. Then:
 
-1. Click the **microphone icon** in the menu bar and switch it on.
+1. Click the **Vocalizer icon** (the waveform in a circle) in the menu bar and switch it on.
 2. macOS asks to allow **System Audio Recording**: click **Allow**.
 3. Play something. The music is gone; the voices stay.
 
@@ -42,7 +42,7 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 
 </details>
 
-**Uninstall:** `curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash`
+**Uninstall:** in Finder, right-click Vocalizer in Applications › **Services › Uninstall Vocalizer**, or drag it to the Bin (it offers to remove its audio device and settings too), or right-click its menu bar icon › **Uninstall Vocalizer…** (removes the app, its audio device, models and settings). Or: `curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash`
 
 ## Using it
 
