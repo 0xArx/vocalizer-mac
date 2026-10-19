@@ -20,10 +20,25 @@ final class Uninstaller: NSObject {
         bundleRef = (Bundle.main.bundleURL as NSURL).fileReferenceURL() as NSURL?
         super.init()
         NSApp.servicesProvider = self
+        Uninstaller.enableFinderEntry()
         NSUpdateDynamicServices()
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.checkTrash() }
         }
+    }
+
+    /// New services can start switched off for Finder's right-click menu. Turn ours on once (the same switch
+    /// as System Settings › Keyboard › Keyboard Shortcuts › Services); if the user later turns it off, leave it.
+    private static func enableFinderEntry() {
+        guard let id = Bundle.main.bundleIdentifier else { return }
+        let key = "\(id) - Uninstall Vocalizer - uninstallService"
+        let domain = "pbs" as CFString
+        var status = CFPreferencesCopyAppValue("NSServicesStatus" as CFString, domain) as? [String: Any] ?? [:]
+        guard status[key] == nil else { return }
+        status[key] = ["enabled_context_menu": true, "enabled_services_menu": true,
+                       "presentation_modes": ["ContextMenu": true, "ServicesMenu": true]]
+        CFPreferencesSetAppValue("NSServicesStatus" as CFString, status as CFDictionary, domain)
+        CFPreferencesAppSynchronize(domain)
     }
 
     private func checkTrash() {
