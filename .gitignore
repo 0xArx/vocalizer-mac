@@ -8,3 +8,4 @@ Driver/VocalizerDriver.c
 .DS_Store
 Models/MelRoformerVocals*
 .signing/
+website/.vercel/

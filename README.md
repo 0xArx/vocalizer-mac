@@ -6,6 +6,8 @@
 any app. It runs entirely on your Mac (Neural Engine), and with the optional audio device it keeps video lips in
 sync with the voice.
 
+**Website and download:** [vocalizer-mac.vercel.app](https://vocalizer-mac.vercel.app)
+
 <p align="center"><img src="docs-menu.png" width="330" alt="Vocalizer menu"></p>
 
 ## Install

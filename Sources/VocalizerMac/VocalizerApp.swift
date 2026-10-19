@@ -23,6 +23,7 @@ struct MenuView: View {
     @EnvironmentObject var model: AppModel
     @AppStorage("showSettings") private var showSettings = false
     @AppStorage("screenCountdown") private var screenCountdown = true
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -43,6 +44,10 @@ struct MenuView: View {
             footer.padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 2)
         }
         .frame(width: 320)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(GeometryReader { g in Color.clear.preference(key: MenuHeightKey.self, value: g.size.height) })
+        .onPreferenceChange(MenuHeightKey.self) { contentHeight = $0 }
+        .background(MenuWindowFitter(height: contentHeight))
         .onAppear { model.refreshSources(); model.refreshOutputs() }
     }
 
@@ -52,14 +57,11 @@ struct MenuView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(on ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.42, green: 0.27, blue: 0.95), Color(red: 0.93, green: 0.30, blue: 0.55)],
-                                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                             : AnyShapeStyle(Color.secondary.opacity(0.18)))
-                Image(systemName: "music.mic").font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(on ? .white : .secondary)
-            }
+            // The app icon: full colour when on, faded grey when off.
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable().interpolation(.high)
+                .saturation(on ? 1 : 0).opacity(on ? 1 : 0.55)
+                .scaleEffect(1.12) // the icon art has transparent margins
             .frame(width: 38, height: 38)
             .animation(.easeInOut(duration: 0.25), value: on)
             VStack(alignment: .leading, spacing: 2) {
@@ -315,6 +317,28 @@ struct StatusView: View {
             }
         } else {
             Text("Version \(model.updater.current)").font(.system(size: 11)).foregroundStyle(.tertiary)
+        }
+    }
+}
+
+private struct MenuHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// MenuBarExtra's window grows with its content but doesn't always shrink back (folding Settings away left an
+/// empty panel). This keeps the window exactly as tall as the content, anchored at the top under the menu bar.
+private struct MenuWindowFitter: NSViewRepresentable {
+    let height: CGFloat
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ view: NSView, context: Context) {
+        let height = height
+        DispatchQueue.main.async {
+            guard height > 0, let window = view.window else { return }
+            let content = window.contentRect(forFrameRect: window.frame)
+            guard abs(content.height - height) > 0.5 else { return }
+            let fitted = NSRect(x: content.minX, y: content.maxY - height, width: content.width, height: height)
+            window.setFrame(window.frameRect(forContentRect: fitted), display: true)
         }
     }
 }

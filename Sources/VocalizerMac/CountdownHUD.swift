@@ -61,7 +61,7 @@ struct CountdownView: View {
                     } else {
                         Circle()
                             .trim(from: 0, to: model.catchUpProgress ?? 1)
-                            .stroke(LinearGradient(colors: [Color(red: 0.42, green: 0.27, blue: 0.95), Color(red: 0.93, green: 0.30, blue: 0.55)],
+                            .stroke(LinearGradient(colors: [Color(red: 0.55, green: 0.24, blue: 1.0), Color(red: 0.80, green: 0.55, blue: 1.0)],
                                                    startPoint: .topLeading, endPoint: .bottomTrailing),
                                     style: StrokeStyle(lineWidth: 7, lineCap: .round))
                             .rotationEffect(.degrees(-90))

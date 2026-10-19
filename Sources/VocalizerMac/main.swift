@@ -103,6 +103,42 @@ if let i = args.firstIndex(of: "--snapshot-hud"), args.count > i + 1 {
     }
     app.run()
 }
+// Checks the menu window follows its content: starts too tall (the old bug), then unfolds and folds Settings.
+if let i = args.firstIndex(of: "--menu-fit-check"), args.count > i + 1 {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    MainActor.assumeIsolated {
+        let model = AppModel()
+        let defaults = UserDefaults.standard
+        let saved = defaults.bool(forKey: "showSettings")
+        defaults.set(false, forKey: "showSettings")
+        let host = NSHostingView(rootView: MenuView().environmentObject(model))
+        let win = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 320, height: 900), styleMask: .borderless, backing: .buffered, defer: false)
+        win.contentView = host
+        win.orderFrontRegardless()
+        var log: [String] = []
+        let h = { win.contentRect(forFrameRect: win.frame).height }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { // lets the models finish loading first
+            log.append("closed \(Int(h()))")
+            defaults.set(true, forKey: "showSettings")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                log.append("open \(Int(h()))")
+                defaults.set(false, forKey: "showSettings")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    log.append("closed again \(Int(h()))")
+                    if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                        host.cacheDisplay(in: host.bounds, to: rep)
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: args[i + 1] + ".png"))
+                    }
+                    defaults.set(saved, forKey: "showSettings")
+                    try? log.joined(separator: "\n").write(toFile: args[i + 1], atomically: true, encoding: .utf8)
+                    exit(0)
+                }
+            }
+        }
+    }
+    app.run()
+}
 if let i = args.firstIndex(of: "--permission-check"), args.count > i + 1 {
     try? "\(AudioPermission.systemAudio)".write(toFile: args[i + 1], atomically: true, encoding: .utf8)
     exit(0)

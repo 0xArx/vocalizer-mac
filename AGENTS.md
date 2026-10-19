@@ -111,7 +111,8 @@ Layout:
 | `Sources/VocalizerMac/` | SwiftUI menu bar app; `main.swift` also has `--selftest`, `--sync-run`, `--snapshot`, `--list` |
 | `Driver/` | `BlackHole.c` (GPL-3.0) + `patch.py` that turns it into the Vocalizer device |
 | `Models/` | Core ML packages (32 / 64 / 256-frame windows); `tools/convert.py` regenerates them from ONNX |
-| `tools/` | Python: model conversion, test fixtures (MUSDB18 samples), loopback analysis |
+| `tools/` | Python: model conversion, test fixtures (MUSDB18 samples), loopback analysis; `make-icon.swift` builds the app icon from `Resources/brand/logo.png` |
+| `website/` | the static site at vocalizer-mac.vercel.app (Vercel project `vocalizer`); deploy with `npx vercel deploy --prod` from that folder |
 
 Rules that matter:
 
