@@ -38,9 +38,22 @@ if [[ -f $DF/target/release/libdf.dylib ]]; then
 else
   echo "note: Speech mode not included (run scripts/build-deepfilter.sh first to add it)"
 fi
-SIGN_ID=${SIGN_ID:-$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple Development/ {print $2; exit}')}
-codesign --force --deep --sign "${SIGN_ID:--}" "$APP" 2>&1 | grep -v "replacing existing signature" || true
-codesign -dv "$APP" 2>&1 | grep -E "Identifier|Authority=Apple Development|Signature=adhoc" || true
+# Signing: a Developer ID identity (public releases, notarized by scripts/notarize.sh) wins over Apple Development
+# (keeps the System Audio Recording permission across local rebuilds); ad hoc when there is neither.
+ids=$(security find-identity -v -p codesigning 2>/dev/null)
+SIGN_ID=${SIGN_ID:-$(awk -F'"' '/Developer ID Application/ {print $2; exit}' <<<"$ids")}
+SIGN_ID=${SIGN_ID:-$(awk -F'"' '/Apple Development/ {print $2; exit}' <<<"$ids")}
+SIGN_ID=${SIGN_ID:--}
+if [[ $SIGN_ID == "Developer ID"* || -n ${HARDENED:-} ]]; then   # HARDENED=1: test the release signing locally
+  # Inside out (the driver was signed by build-driver.sh), hardened runtime, secure timestamp: what notarization needs.
+  SIGN=(codesign --force --options runtime --timestamp --sign "$SIGN_ID")
+  [[ -f $APP/Contents/Frameworks/libdf.dylib ]] && $SIGN "$APP/Contents/Frameworks/libdf.dylib"
+  $SIGN --entitlements Resources/Vocalizer.entitlements "$APP"
+  codesign --verify --strict --deep "$APP"
+else
+  codesign --force --deep --sign "$SIGN_ID" "$APP" 2>&1 | grep -v "replacing existing signature" || true
+fi
+codesign -dv "$APP" 2>&1 | grep -E "Identifier|Authority=(Apple Development|Developer ID Application)|Signature=adhoc|runtime" || true
 echo "built $APP"
 # --install: copy this build over /Applications/Vocalizer.app.
 if [[ "${1:-}" == "--install" ]]; then

@@ -6,6 +6,12 @@ cd "$(dirname "$0")/.."
 [[ -f .build/deepfilter/target/release/libdf.dylib || -f ../vendor/DeepFilterNet/target/release/libdf.dylib ]] \
   || scripts/build-deepfilter.sh
 scripts/build-app.sh
+# Public releases must be notarized (Developer ID); a local identity builds an unnotarized test zip.
+if codesign -dv build/Vocalizer.app 2>&1 | grep -q "Authority=Developer ID Application"; then
+  scripts/notarize.sh
+else
+  echo "warning: not signed with Developer ID, so this zip is NOT notarized (downloads will be blocked by Gatekeeper)"
+fi
 rm -f build/Vocalizer-macOS.zip
 ditto -c -k --norsrc --noextattr --keepParent build/Vocalizer.app build/Vocalizer-macOS.zip
 shasum -a 256 build/Vocalizer-macOS.zip
