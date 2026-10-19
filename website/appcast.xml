@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Vocalizer</title>
+    <link>https://vocalizer-mac.vercel.app/appcast.xml</link>
+    <description>Updates for Vocalizer for Mac</description>
+    <language>en</language>
+    <item>
+      <title>Vocalizer 0.3.5</title>
+      <sparkle:version>20</sparkle:version>
+      <sparkle:shortVersionString>0.3.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.2</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 19 Oct 2026 13:29:53 GMT</pubDate>
+      <description><![CDATA[
+        <ul>
+          <li>Vocalizer now updates itself: new versions download in the background and install when nothing is playing</li>
+          <li>Every update is checked against Vocalizer&#x27;s signature and Apple Developer ID before it installs</li>
+          <li>New: Install updates automatically in Settings, and Check for Updates when you right-click the menu bar icon</li>
+        </ul>
+      ]]></description>
+      <enclosure url="https://github.com/0xArx/vocalizer-mac/releases/download/v0.3.5/Vocalizer-macOS.zip" sparkle:edSignature="jeyoO7sYeFPwBp7ouLeKxeD/wfw7jdiux35etPuzMgyz4jmxze1dzmDWpfObPa118BnCEQLRykLHpoLbEz33CA==" length="111197617" type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>
