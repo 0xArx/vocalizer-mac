@@ -148,7 +148,7 @@ struct MenuView: View {
     private var modePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                ForEach(model.availableModes) { m in
+                ForEach(model.modeChoices) { m in
                     Button { model.mode = m } label: {
                         VStack(spacing: 5) {
                             if model.preparing == m {
@@ -201,7 +201,7 @@ struct MenuView: View {
         return HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L("Mute swear words")).font(.system(size: 12.5))
-                Text(model.muteSwearWords ? swearHint : L("Silences swear words as they play. Recognized on this Mac."))
+                Text(model.muteSwearWords ? swearHint : L("Silences swear words as they play. Uses Clean or Best: Fast and Calls are too quick to catch them."))
                     .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
@@ -223,16 +223,10 @@ struct MenuView: View {
 
     private var swearHint: String {
         if let e = model.stats.profanityError, model.muteSwearWords { return L("Speech recognition isn't available: %@", "\(e)") }
-        switch model.mode {
-        case .live, .ultra, .balanced:
-            return model.fastOnly
-                ? L("Fast is too quick: words play before they're recognized. Turn off Fast only and use Best or Clean.")
-                : L("This mode is too quick: words play before they're recognized. Use Best or Clean.")
-        case .quality:
-            return L("Catches most swear words, sometimes with a bit of the next word. Best is more precise.")
-        case .supreme:
-            return L("Catches nearly every swear word, precisely. Recognized on this Mac.")
-        }
+        // Fast and Calls aren't offered while it's on (too quick to catch words before they play).
+        return model.mode == .supreme
+            ? L("Catches nearly every swear word, precisely. Recognized on this Mac.")
+            : L("Catches most swear words, sometimes with a bit of the next word. Best is more precise.")
     }
 
     // MARK: settings, folded away
@@ -253,7 +247,9 @@ struct MenuView: View {
 
             if showSettings {
                 VStack(alignment: .leading, spacing: 12) {
-                    settingToggle(L("Fast only"), L("Hide the other modes and always use Fast."), $model.fastOnly)
+                    if !model.muteSwearWords {
+                        settingToggle(L("Fast only"), L("Hide the other modes and always use Fast."), $model.fastOnly)
+                    }
                     settingToggle(L("Keep video in sync"), L("Videos wait for the voice, so lips always match."), $model.syncVideo)
                     if model.swearFilterSupported {
                         swearSetting

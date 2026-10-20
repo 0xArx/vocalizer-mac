@@ -65,13 +65,11 @@
 "Plays on" = "يعمل على";
 "Mute swear words" = "كتم الألفاظ البذيئة";
 "Getting ready" = "جارٍ التجهيز";
-"Silences swear words as they play. Recognized on this Mac." = "يكتم الألفاظ البذيئة أثناء التشغيل. يتم التعرّف عليها على جهازك.";
+"Silences swear words as they play. Uses Clean or Best: Fast and Calls are too quick to catch them." = "يكتم الألفاظ البذيئة أثناء التشغيل. يستخدم وضع «نقي» أو «الأفضل»، لأن «سريع» و«مكالمات» أسرع من أن تلتقطها.";
 "Unavailable" = "غير متاح";
 "Listening" = "يستمع";
 "%@ muted" = "كُتمت %@";
 "Speech recognition isn't available: %@" = "التعرّف على الكلام غير متاح: %@";
-"Fast is too quick: words play before they're recognized. Turn off Fast only and use Best or Clean." = "وضع «سريع» سريع جدًا: تُسمع الكلمات قبل التعرّف عليها. أوقف «سريع فقط» واستخدم «الأفضل» أو «نقي».";
-"This mode is too quick: words play before they're recognized. Use Best or Clean." = "هذا الوضع سريع جدًا: تُسمع الكلمات قبل التعرّف عليها. استخدم «الأفضل» أو «نقي».";
 "Catches most swear words, sometimes with a bit of the next word. Best is more precise." = "يلتقط معظم الألفاظ البذيئة، وأحيانًا مع جزء من الكلمة التالية. «الأفضل» أدق.";
 "Catches nearly every swear word, precisely. Recognized on this Mac." = "يلتقط كل الألفاظ البذيئة تقريبًا بدقة. يجري التعرّف على هذا الـ Mac.";
 "Settings" = "الإعدادات";

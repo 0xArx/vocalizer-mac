@@ -60,6 +60,8 @@ enum Mode: String, CaseIterable, Identifiable {
         let buffer = sync ? syncJitterMs : (self == .supreme ? 2700 : self == .quality ? 250 : self == .ultra ? 25 : 100)
         return latencyMs + buffer + 35
     }
+    /// Slow enough for the swear-word filter: words are recognized before they play.
+    var catchesSwearWords: Bool { self == .quality || self == .supreme }
     /// Extra buffering in sync mode, where the delay is hidden from video anyway.
     /// (Supreme measures its own on load, ~2.7 s; this is the estimate shown before it runs.)
     var syncJitterMs: Double { self == .supreme ? 2700 : self == .quality ? 300 : self == .ultra ? 80 : 200 }
@@ -79,6 +81,7 @@ final class AppModel: ObservableObject {
     @Published var fastOnly = UserDefaults.standard.bool(forKey: "fastOnly") {
         didSet {
             if !AppModel.testing { UserDefaults.standard.set(fastOnly, forKey: "fastOnly") }
+            if fastOnly && muteSwearWords { muteSwearWords = false } // Fast can't catch swear words
             if fastOnly && mode != .live { mode = .live }
         }
     }
@@ -122,13 +125,26 @@ final class AppModel: ObservableObject {
               let installed = version(URL(fileURLWithPath: "/Library/Audio/Plug-Ins/HAL/Vocalizer.driver")) else { return false }
         return installed < bundled
     }
-    /// Optional swear-word filter (Apple's on-device speech recognition). Adds no delay.
+    /// Optional swear-word filter (Apple's on-device speech recognition). Adds no delay of its own, but it
+    /// needs the time Clean or Best already have: in Fast and Calls the words play before they're recognized.
+    /// So while it's on, only Clean and Best are offered, and turning it off goes back to the earlier mode.
     @Published var muteSwearWords = UserDefaults.standard.bool(forKey: "muteSwearWords") {
         didSet {
+            guard muteSwearWords != oldValue else { return }
             if !AppModel.testing { UserDefaults.standard.set(muteSwearWords, forKey: "muteSwearWords") }
             engine.setProfanityFilter(muteSwearWords)
+            if muteSwearWords {
+                if fastOnly { fastOnly = false }
+                if !mode.catchesSwearWords { modeBeforeFilter = mode; mode = .quality }
+            } else {
+                if let m = modeBeforeFilter, mode == .quality { mode = m }
+                modeBeforeFilter = nil
+            }
         }
     }
+    private var modeBeforeFilter: Mode?
+    /// The modes the menu offers right now.
+    var modeChoices: [Mode] { muteSwearWords ? availableModes.filter(\.catchesSwearWords) : availableModes }
     let swearFilterSupported = VocalizerEngine.profanityFilterSupported
     @Published private(set) var reportedLatencyMs = 0.0
     // MARK: Supreme model download
@@ -229,6 +245,11 @@ final class AppModel: ObservableObject {
         installSignalHandlers()
         startWatchdog()
         engine.setProfanityFilter(muteSwearWords)
+        if muteSwearWords { // saved settings from before Fast was excluded
+            if fastOnly && !AppModel.testing { UserDefaults.standard.set(false, forKey: "fastOnly") }
+            fastOnly = false
+            mode = .quality
+        }
         if !AppModel.testing {
             hotKey = HotKey { [weak self] in
                 guard let self, self.ready else { return }

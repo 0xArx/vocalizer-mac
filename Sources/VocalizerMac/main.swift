@@ -148,6 +148,8 @@ if let i = args.firstIndex(of: "--menu-fit-check"), args.count > i + 1 {
     app.setActivationPolicy(.accessory)
     MainActor.assumeIsolated {
         let model = AppModel()
+        // VOCALIZER_TEST_SWEAR=1/0: show the menu with Mute swear words on/off (not saved).
+        if let v = ProcessInfo.processInfo.environment["VOCALIZER_TEST_SWEAR"] { model.muteSwearWords = v == "1" }
         let defaults = UserDefaults.standard
         let saved = defaults.bool(forKey: "showSettings")
         defaults.set(false, forKey: "showSettings")
