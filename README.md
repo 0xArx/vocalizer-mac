@@ -96,7 +96,9 @@ Vocalizer uses [Sparkle](https://sparkle-project.org) for updates, and **asks be
 checks every 4 hours; when there's a new version it shows a small note in its menu (no window pops up), and you
 choose when to click **Update…**, read what changed, and install. Right-click the menu bar icon for **Check for
 Updates…**. If you'd rather not think about it, Settings › **Install updates automatically** downloads new
-versions in the background and installs them when nothing is playing. (Versions 0.3.5 and 0.3.6 installed updates
+versions in the background and installs them when nothing is playing. Either way, installing never asks for your
+password: Vocalizer checks the update's signature and Developer ID itself, then swaps the whole app (macOS protects
+the inside of notarized apps, which made Sparkle's own installer ask for an admin password). (Versions 0.3.5 and 0.3.6 installed updates
 automatically by default; from 0.3.7 the default is to ask.) Every release and its changes are listed on the
 [releases page](https://github.com/0xArx/vocalizer-mac/releases).
 

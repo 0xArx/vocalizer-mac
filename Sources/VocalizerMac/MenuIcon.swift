@@ -1,4 +1,4 @@
-// The menu bar icon: the Vocalizer logo (a ring with messy sound in, the filter bars, a clean wave out),
+// The menu bar icon: the Vocalizer logo simplified for 18 pt (a ring, a tiny squiggle in, a clean wave out),
 // drawn as a template image so macOS tints it like any system icon. On: a filled disc with the wave cut out.
 // Off: just the ring and the wave.
 
@@ -34,26 +34,28 @@ enum MenuIcon {
         return img
     }
 
-    /// Messy wave in on the left, three bars, one clean wave out on the right.
+    /// A tiny squiggle at the very start (the messy sound going in), then a big clean wave (the voice
+    /// coming out). At 18 pt the clean wave has to dominate or the icon reads as noise.
     private static func waveform(in r: NSRect) -> NSBezierPath {
         let p = NSBezierPath()
-        p.lineWidth = 1.05
+        p.lineWidth = 1.3
         p.lineCapStyle = .round
         p.lineJoinStyle = .round
         let mid = r.midY
-        // In: an uneven wiggle.
-        let inPts: [(CGFloat, CGFloat)] = [(3.8, 0.2), (4.7, 2.0), (5.6, -1.7), (6.4, 0.5)]
-        p.move(to: NSPoint(x: inPts[0].0, y: mid + inPts[0].1))
-        for (x, dy) in inPts.dropFirst() { p.line(to: NSPoint(x: x, y: mid + dy)) }
-        // The filter: three bars, tallest in the middle.
-        for (x, h) in [(7.7, 5.0), (9.3, 8.6), (10.9, 4.4)] as [(CGFloat, CGFloat)] {
-            p.move(to: NSPoint(x: x, y: mid - h / 2))
-            p.line(to: NSPoint(x: x, y: mid + h / 2))
+        // In: a short, small zigzag.
+        p.move(to: NSPoint(x: 3.3, y: mid + 0.2))
+        p.line(to: NSPoint(x: 4.3, y: mid + 1.4))
+        p.line(to: NSPoint(x: 5.3, y: mid - 1.4))
+        p.line(to: NSPoint(x: 6.3, y: mid))
+        // Out: 1.5 smooth periods of a sine wave, taller than the zigzag.
+        let start: CGFloat = 6.3, end: CGFloat = 14.7, amp: CGFloat = 3.0
+        let steps = 48
+        for i in 1...steps {
+            let t = CGFloat(i) / CGFloat(steps)
+            let x = start + (end - start) * t
+            let y = mid + amp * sin(t * 2 * .pi * 1.5)
+            p.line(to: NSPoint(x: x, y: y))
         }
-        // Out: one clean wave.
-        p.move(to: NSPoint(x: 12.2, y: mid))
-        p.curve(to: NSPoint(x: 13.3, y: mid), controlPoint1: NSPoint(x: 12.5, y: mid + 1.7), controlPoint2: NSPoint(x: 13.0, y: mid + 1.7))
-        p.curve(to: NSPoint(x: 14.4, y: mid), controlPoint1: NSPoint(x: 13.6, y: mid - 1.7), controlPoint2: NSPoint(x: 14.1, y: mid - 1.7))
         return p
     }
 }

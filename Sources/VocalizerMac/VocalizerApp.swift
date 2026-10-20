@@ -126,7 +126,8 @@ struct MenuView: View {
         } else if let v = model.updater.ready {
             notice("sparkles", .accentColor, "Vocalizer \(v) is ready. It installs when nothing is playing.", "Install now") { model.updater.installReadyUpdate() }
         } else if let v = model.updater.available {
-            notice("sparkles", .accentColor, "Vocalizer \(v) is available.", "Update…") { model.updater.checkForUpdates() }
+            notice("sparkles", .accentColor, model.updater.installing ? "Updating to Vocalizer \(v)…" : "Vocalizer \(v) is available.",
+                   model.updater.installing ? nil : "Update") { model.updater.installAvailable() }
         }
     }
 
