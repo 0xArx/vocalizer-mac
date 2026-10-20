@@ -79,7 +79,7 @@ but is no longer offered in the menu.)
   each time sound starts again (a new video, play, or seeking). Best loads in the background with a spinner on its
   tile while the current mode keeps playing (it used to freeze the menu for ~6 s).
 - **Open at login** is in the menu; Vocalizer remembers whether it was on.
-- **Updates install themselves** (Sparkle): Vocalizer checks every 4 hours, downloads new versions in the background, verifies their signature and Developer ID, and installs when nothing is playing, then reopens as it was. Turn it off in Settings (**Install updates automatically**); right-click the menu bar icon for **Check for Updates…**.
+- **Updates ask first** (Sparkle): Vocalizer checks every 4 hours and, when there's a new version, shows a small note in its menu. Nothing installs until you click **Update…** and then **Install**. Every update's signature and Developer ID are checked first. Right-click the menu bar icon for **Check for Updates…**. If you prefer, Settings › **Install updates automatically** installs new versions on its own when nothing is playing.
 - Things that can't wait (games, live calls) still hear the delay. Use Calls mode for those.
 - Video sync is verified for long delays too: with Supreme's ~7.2 s, Chrome held the picture for 7.1 s and Apple's
   player (Safari, QuickTime, TV) for 7.4 s before playing, then played smoothly.
@@ -92,15 +92,17 @@ network requests: the update check every 4 hours (a small file on the Vocalizer 
 
 ## Updates and security
 
-Vocalizer updates itself with [Sparkle](https://sparkle-project.org): it checks every 4 hours, downloads new
-versions in the background, and installs them when nothing is playing (Vocalizer off, or a minute of silence), then
-reopens as it was. Turn this off in Settings (**Install updates automatically**). Right-click the menu bar icon for
-**Check for Updates…**. Every release and its changes are listed on the
+Vocalizer uses [Sparkle](https://sparkle-project.org) for updates, and **asks before installing anything**. It
+checks every 4 hours; when there's a new version it shows a small note in its menu (no window pops up), and you
+choose when to click **Update…**, read what changed, and install. Right-click the menu bar icon for **Check for
+Updates…**. If you'd rather not think about it, Settings › **Install updates automatically** downloads new
+versions in the background and installs them when nothing is playing. (Versions 0.3.5 and 0.3.6 installed updates
+automatically by default; from 0.3.7 the default is to ask.) Every release and its changes are listed on the
 [releases page](https://github.com/0xArx/vocalizer-mac/releases).
 
-**What a safe auto-update can and can't prove.** It proves an update came from the same developer and wasn't
-changed along the way. It can't prove the developer means well, so turning on automatic updates means trusting the
-developer to keep behaving and to keep their keys safe. That is true of every app that updates itself, App Store
+**What a safe update can and can't prove.** It proves an update came from the same developer and wasn't
+changed along the way. It can't prove the developer means well, so installing any update, and especially turning on automatic
+updates, means trusting the developer to keep behaving and to keep their keys safe. That is true of every app that updates itself, App Store
 apps included.
 
 **What protects you with Vocalizer's updates:**
@@ -135,7 +137,9 @@ attack on trusted software is rare but real, which is why those keys are kept of
 - Background updaters (Google, Microsoft, Zoom and others): System Settings › General › **Login Items &
   Extensions** › Allow in the Background. These run even when the app isn't open.
 
-Found a security problem? See [SECURITY.md](SECURITY.md).
+**Can anyone change it because it's open source?** No. Anyone can read the code and suggest changes, but only the
+maintainer can push to this repository or publish releases, and every release needs signing keys that never leave the
+maintainer's Mac. See [SECURITY.md](SECURITY.md), which is also where to report a security problem.
 
 ## How it works
 

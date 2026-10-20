@@ -125,6 +125,8 @@ struct MenuView: View {
             notice("film", .accentColor, "A newer audio device came with this update.", "Update") { model.installDriver() }
         } else if let v = model.updater.ready {
             notice("sparkles", .accentColor, "Vocalizer \(v) is ready. It installs when nothing is playing.", "Install now") { model.updater.installReadyUpdate() }
+        } else if let v = model.updater.available {
+            notice("sparkles", .accentColor, "Vocalizer \(v) is available.", "Update…") { model.updater.checkForUpdates() }
         }
     }
 
@@ -258,7 +260,7 @@ struct MenuView: View {
                     settingToggle("Fast only", "Hide the other modes and always use Fast.", $model.fastOnly)
                     settingToggle("Keep video in sync", "Videos wait for the voice, so lips always match.", $model.syncVideo)
                     settingToggle("Open at login", "Start Vocalizer when you log in.", $model.openAtLogin)
-                    settingToggle("Install updates automatically", "New versions install when nothing is playing.",
+                    settingToggle("Install updates automatically", "Off: Vocalizer tells you about new versions and asks first.",
                                   Binding(get: { model.updater.automaticallyInstalls }, set: { model.updater.automaticallyInstalls = $0 }))
                     if !model.fastOnly {
                         settingToggle("Show countdown on screen", "While a video waits for the voice (Best, Clean).", $screenCountdown)
