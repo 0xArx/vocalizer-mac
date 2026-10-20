@@ -36,9 +36,6 @@ struct MenuView: View {
             }
             Divider().padding(.horizontal, 16)
             outputRow.padding(.horizontal, 16).padding(.vertical, 10)
-            if model.swearFilterSupported {
-                swearRow.padding(.horizontal, 16).padding(.bottom, 10)
-            }
             Divider().padding(.horizontal, 16)
             settings.padding(.horizontal, 16).padding(.vertical, 10)
             footer.padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 2)
@@ -198,32 +195,29 @@ struct MenuView: View {
 
     // MARK: swear-word filter
 
-    private var swearRow: some View {
+    /// In Settings: the switch, what it's doing right now, and how well the current mode can catch words.
+    private var swearSetting: some View {
         let s = model.stats
-        return VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 8) {
-                Image(systemName: model.muteSwearWords ? "speaker.slash.fill" : "speaker.slash")
-                    .foregroundStyle(model.muteSwearWords ? Color.accentColor : .secondary).frame(width: 18)
+        return HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(L("Mute swear words")).font(.system(size: 12.5))
-                Spacer()
-                if model.muteSwearWords && on {
-                    Group {
-                        if s.profanityPreparing {
-                            HStack(spacing: 4) { ProgressView().controlSize(.mini); Text(L("Getting ready")) }
-                        } else if s.profanityError != nil {
-                            Text(L("Unavailable"))
-                        } else if s.profanityFilter {
-                            Text(s.wordsCaught == 0 ? L("Listening") : L("%@ muted", "\(s.wordsCaught)"))
-                        }
+                Text(model.muteSwearWords ? swearHint : L("Silences swear words as they play. Recognized on this Mac."))
+                    .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            if model.muteSwearWords && on {
+                Group {
+                    if s.profanityPreparing {
+                        HStack(spacing: 4) { ProgressView().controlSize(.mini); Text(L("Getting ready")) }
+                    } else if s.profanityError != nil {
+                        Text(L("Unavailable"))
+                    } else if s.profanityFilter {
+                        Text(s.wordsCaught == 0 ? L("Listening") : L("%@ muted", "\(s.wordsCaught)"))
                     }
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
-                Toggle("", isOn: $model.muteSwearWords).toggleStyle(.switch).controlSize(.mini).labelsHidden()
+                .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize()
             }
-            if model.muteSwearWords {
-                Text(swearHint).font(.system(size: 11)).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true).padding(.leading, 26)
-            }
+            Toggle("", isOn: $model.muteSwearWords).toggleStyle(.switch).controlSize(.mini).labelsHidden()
         }
     }
 
@@ -261,6 +255,9 @@ struct MenuView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     settingToggle(L("Fast only"), L("Hide the other modes and always use Fast."), $model.fastOnly)
                     settingToggle(L("Keep video in sync"), L("Videos wait for the voice, so lips always match."), $model.syncVideo)
+                    if model.swearFilterSupported {
+                        swearSetting
+                    }
                     settingToggle(L("Open at login"), L("Start Vocalizer when you log in."), $model.openAtLogin)
                     settingToggle(L("Install updates automatically"), L("Off: Vocalizer tells you about new versions and asks first."),
                                   Binding(get: { model.updater.automaticallyInstalls }, set: { model.updater.automaticallyInstalls = $0 }))

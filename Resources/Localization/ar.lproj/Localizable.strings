@@ -65,6 +65,7 @@
 "Plays on" = "يعمل على";
 "Mute swear words" = "كتم الألفاظ البذيئة";
 "Getting ready" = "جارٍ التجهيز";
+"Silences swear words as they play. Recognized on this Mac." = "يكتم الألفاظ البذيئة أثناء التشغيل. يتم التعرّف عليها على جهازك.";
 "Unavailable" = "غير متاح";
 "Listening" = "يستمع";
 "%@ muted" = "كُتمت %@";
