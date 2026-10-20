@@ -27,10 +27,11 @@ document.documentElement.classList.add("js");
   const hero = document.getElementById("hero");
   if (canvas && sw) {
     const ctx = canvas.getContext("2d");
-    let colors = [];
+    let colors = [], musicBar = "150, 115, 230";
     const readColors = () => {
       const cs = getComputedStyle(document.documentElement);
       colors = ["--wave-a", "--wave-b", "--wave-c"].map((v) => cs.getPropertyValue(v).trim() || "#8b3dff");
+      musicBar = cs.getPropertyValue("--music-bar").trim() || "150, 115, 230";
     };
     readColors();
     document.addEventListener("themechange", () => { readColors(); if (reduce) draw(); });
@@ -55,7 +56,7 @@ document.documentElement.classList.add("js");
 
       // Music: wide, steady bars (drums and chords), sinking into the floor when filtered.
       if (music > 0.01) {
-        ctx.fillStyle = `rgba(120, 110, 140, ${0.22 + 0.5 * music})`;
+        ctx.fillStyle = `rgba(${musicBar}, ${0.22 + 0.5 * music})`;
         for (let i = 0; i < bars; i++) {
           const beat = 0.55 + 0.45 * Math.abs(Math.sin((i + t * 9) * 0.55));
           const chord = 0.6 + 0.4 * Math.sin(i * 0.21 + t * 1.3);
