@@ -6,6 +6,19 @@
     <description>Updates for Vocalizer for Mac</description>
     <language>en</language>
     <item>
+      <title>Vocalizer 0.3.13</title>
+      <sparkle:version>28</sparkle:version>
+      <sparkle:shortVersionString>0.3.13</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.2</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 20 Oct 2026 11:48:31 GMT</pubDate>
+      <description><![CDATA[
+        <ul>
+          <li>Open-source licenses now ship with the app: right-click the menu bar icon › Licenses…</li>
+        </ul>
+      ]]></description>
+      <enclosure url="https://github.com/0xArx/vocalizer-mac/releases/download/v0.3.13/Vocalizer-macOS.zip" sparkle:edSignature="YInvhR+a4632gilbsW/SJfaO58e3OawNbozyjtzMa1s/RsLS8Njg1MS6GNkcoAofdDKK0ROOvtHP+z99IQUFBg==" length="111254037" type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Vocalizer 0.3.12</title>
       <sparkle:version>27</sparkle:version>
       <sparkle:shortVersionString>0.3.12</sparkle:shortVersionString>
