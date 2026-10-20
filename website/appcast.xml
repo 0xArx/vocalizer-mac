@@ -6,6 +6,20 @@
     <description>Updates for Vocalizer for Mac</description>
     <language>en</language>
     <item>
+      <title>Vocalizer 0.3.8</title>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>0.3.8</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.2</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 20 Oct 2026 07:55:48 GMT</pubDate>
+      <description><![CDATA[
+        <ul>
+          <li>Vocalizer has its own address: getvocalizer.com</li>
+          <li>Updates now come from getvocalizer.com (the old address keeps working)</li>
+        </ul>
+      ]]></description>
+      <enclosure url="https://github.com/0xArx/vocalizer-mac/releases/download/v0.3.8/Vocalizer-macOS.zip" sparkle:edSignature="q3vO7oP5fxxCHPxLew2q4VPjmL32j52Dbf5vF4O5gMPx903Wx2zyIbilCjdXwaRYiLD+wKBUSzwgLToC91CpAg==" length="111200344" type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Vocalizer 0.3.7</title>
       <sparkle:version>22</sparkle:version>
       <sparkle:shortVersionString>0.3.7</sparkle:shortVersionString>
