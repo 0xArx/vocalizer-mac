@@ -6,6 +6,21 @@
     <description>Updates for Vocalizer for Mac</description>
     <language>en</language>
     <item>
+      <title>Vocalizer 0.3.7</title>
+      <sparkle:version>22</sparkle:version>
+      <sparkle:shortVersionString>0.3.7</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.2</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 20 Oct 2026 05:52:59 GMT</pubDate>
+      <description><![CDATA[
+        <ul>
+          <li>Updates now ask first: when there&#x27;s a new version, a note appears in the menu and nothing installs until you choose</li>
+          <li>Prefer the old way? Settings › Install updates automatically</li>
+          <li>Clearer security notes: only the maintainer can publish updates, and every update is signature-checked</li>
+        </ul>
+      ]]></description>
+      <enclosure url="https://github.com/0xArx/vocalizer-mac/releases/download/v0.3.7/Vocalizer-macOS.zip" sparkle:edSignature="/a6IsmfXH44c1BBU0KqNVG35//YSPAokXa3gTrh/cfMegrfSi1F17JoeuQHnU0JFUtknvWEXPjBYxfVMk3QyCA==" length="111200338" type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Vocalizer 0.3.6</title>
       <sparkle:version>21</sparkle:version>
       <sparkle:shortVersionString>0.3.6</sparkle:shortVersionString>
