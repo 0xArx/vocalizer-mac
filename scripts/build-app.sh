@@ -26,6 +26,8 @@ mkdir -p "$APP/Contents/Frameworks"
 ditto .build/release/Sparkle.framework "$APP/Contents/Frameworks/Sparkle.framework"
 rm -rf "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" "$APP/Contents/Frameworks/Sparkle.framework/XPCServices"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+# Translations (English is the key text in the code; see Sources/VocalizerMac/Localization.swift).
+for l in Resources/Localization/*.lproj; do ditto "$l" "$APP/Contents/Resources/$(basename $l)"; done
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 # Sync-video driver (installed from the menu, or with scripts/install-driver.sh).
 Driver/build-driver.sh >/dev/null

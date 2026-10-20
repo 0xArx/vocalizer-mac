@@ -27,18 +27,18 @@ final class StatusMenu: NSObject {
     private func show(in window: NSWindow) {
         let menu = NSMenu()
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        let title = NSMenuItem(title: "Vocalizer \(version)", action: nil, keyEquivalent: "")
+        let title = NSMenuItem(title: L("Vocalizer %@", version), action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
         menu.addItem(.separator())
-        let check = NSMenuItem(title: "Check for Updates…", action: #selector(checkClicked), keyEquivalent: "")
+        let check = NSMenuItem(title: L("Check for Updates…"), action: #selector(checkClicked), keyEquivalent: "")
         check.target = self
         menu.addItem(check)
-        let remove = NSMenuItem(title: "Uninstall Vocalizer…", action: #selector(uninstallClicked), keyEquivalent: "")
+        let remove = NSMenuItem(title: L("Uninstall Vocalizer…"), action: #selector(uninstallClicked), keyEquivalent: "")
         remove.target = self
         menu.addItem(remove)
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit Vocalizer", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: L("Quit Vocalizer"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
         guard let view = window.contentView else { return }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.minY - 4), in: view)

@@ -18,8 +18,8 @@ enum WelcomeWindow {
         }
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 400), styleMask: [.titled, .closable],
                          backing: .buffered, defer: false)
-        w.title = "Welcome to Vocalizer"
-        w.contentView = NSHostingView(rootView: view)
+        w.title = L("Welcome to Vocalizer")
+        w.contentView = NSHostingView(rootView: view.environment(\.layoutDirection, appLayoutDirection))
         w.isReleasedWhenClosed = false
         w.center()
         window = w
@@ -37,27 +37,27 @@ struct WelcomeView: View {
             HStack(spacing: 14) {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 56, height: 56)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Vocalizer").font(.title2.bold())
-                    Text("Removes the music from anything your Mac plays. Keeps the voices.").foregroundStyle(.secondary)
+                    Text(verbatim: "Vocalizer").font(.title2.bold())
+                    Text(L("Removes the music from anything your Mac plays. Keeps the voices.")).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            step("1", "Find it in the menu bar", "Click the microphone icon at the top right of your screen and flip the switch.")
-            step("2", "Allow System Audio Recording", "The first time, macOS asks. Click Allow. Audio never leaves your Mac.")
+            step("1", L("Find it in the menu bar"), L("Click the Vocalizer icon (a wave in a circle) at the top right of your screen and flip the switch."))
+            step("2", L("Allow System Audio Recording"), L("The first time, macOS asks. Click Allow. Audio never leaves your Mac."))
             if model.driverInstalled {
-                step("3", "Video stays in sync", "The Vocalizer audio device is installed, so videos wait for the voice.")
+                step("3", L("Video stays in sync"), L("The Vocalizer audio device is installed, so videos wait for the voice."))
             } else {
                 VStack(alignment: .leading, spacing: 6) {
-                    step("3", "Keep video in sync (recommended)", "Installs a small audio device so videos wait for the voice. Asks for your password once.")
-                    Button("Install the audio device…") { model.installDriver() }.padding(.leading, 34)
+                    step("3", L("Keep video in sync (recommended)"), L("Installs a small audio device so videos wait for the voice. Asks for your password once."))
+                    Button(L("Install the audio device…")) { model.installDriver() }.padding(.leading, 34)
                 }
             }
-            step("4", "Shortcut ⌥⇧V", "Press Option-Shift-V anywhere to switch Vocalizer on or off.")
+            step("4", L("Shortcut ⌥⇧V"), L("Press Option-Shift-V anywhere to switch Vocalizer on or off."))
             Spacer()
             HStack {
-                Toggle("Open at login", isOn: $model.openAtLogin)
+                Toggle(L("Open at login"), isOn: $model.openAtLogin)
                 Spacer()
-                Button("Got it", action: done).keyboardShortcut(.defaultAction)
+                Button(L("Got it"), action: done).keyboardShortcut(.defaultAction)
             }
         }
         .padding(22)

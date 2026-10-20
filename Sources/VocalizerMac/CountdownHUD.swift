@@ -25,7 +25,7 @@ final class CountdownHUD {
             p.ignoresMouseEvents = true
             p.level = .screenSaver
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-            p.contentView = NSHostingView(rootView: CountdownView(model: model))
+            p.contentView = NSHostingView(rootView: CountdownView(model: model).environment(\.layoutDirection, appLayoutDirection))
             panel = p
             return p
         }()
@@ -70,7 +70,7 @@ struct CountdownView: View {
                     }
                 }
                 .frame(width: 84, height: 84)
-                Text(model.preparing != nil ? "Preparing Best" : "Video starts soon")
+                Text(model.preparing != nil ? L("Preparing Best") : L("Video starts soon"))
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
             }
             .frame(width: 190, height: 190)

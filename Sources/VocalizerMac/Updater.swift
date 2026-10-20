@@ -99,11 +99,11 @@ final class Updater: NSObject, ObservableObject {
         guard let version = available else { return }
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Vocalizer \(version) is available"
-        alert.informativeText = "You have \(current). Install it now? Vocalizer quits and reopens in a few seconds."
-        alert.addButton(withTitle: "Install Now")
-        alert.addButton(withTitle: "Later")
-        alert.addButton(withTitle: "What's New")
+        alert.messageText = L("Vocalizer %@ is available", version)
+        alert.informativeText = L("You have %@. Install it now? Vocalizer quits and reopens in a few seconds.", current)
+        alert.addButton(withTitle: L("Install Now"))
+        alert.addButton(withTitle: L("Later"))
+        alert.addButton(withTitle: L("What's New"))
         switch alert.runModal() {
         case .alertFirstButtonReturn:
             installAvailable()
@@ -153,8 +153,8 @@ extension Updater: SPUUpdaterDelegate {
             self.manualCheck = false
             NSApp.activate(ignoringOtherApps: true)
             let alert = NSAlert()
-            alert.messageText = "Vocalizer is up to date"
-            alert.informativeText = "You have the latest version, \(self.current)."
+            alert.messageText = L("Vocalizer is up to date")
+            alert.informativeText = L("You have the latest version, %@.", self.current)
             alert.runModal()
         }
     }

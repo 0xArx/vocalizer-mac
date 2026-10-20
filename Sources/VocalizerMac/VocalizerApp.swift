@@ -44,6 +44,7 @@ struct MenuView: View {
             footer.padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 2)
         }
         .frame(width: 320)
+        .environment(\.layoutDirection, appLayoutDirection)
         .fixedSize(horizontal: false, vertical: true)
         .background(GeometryReader { g in Color.clear.preference(key: MenuHeightKey.self, value: g.size.height) })
         .onPreferenceChange(MenuHeightKey.self) { contentHeight = $0 }
@@ -65,7 +66,7 @@ struct MenuView: View {
             .frame(width: 38, height: 38)
             .animation(.easeInOut(duration: 0.25), value: on)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Vocalizer").font(.system(size: 15, weight: .semibold))
+                Text(verbatim: "Vocalizer").font(.system(size: 15, weight: .semibold))
                 Text(statusLine).font(.system(size: 12)).foregroundStyle(.secondary)
             }
             Spacer()
@@ -86,13 +87,13 @@ struct MenuView: View {
     }
 
     private var statusLine: String {
-        if !model.ready { return "Getting ready…" }
-        if let p = model.preparing { return "Preparing \(p.title)…" }
-        if on, let n = model.catchUpSeconds { return "Video starts in \(n) s" }
-        if model.enabled && model.mode.separation == nil { return "Download needed for Best" }
-        if model.enabled && !model.stats.running { return "Starting…" }
-        if on { return "Removing the music" }
-        return "Off. Sound plays normally"
+        if !model.ready { return L("Getting ready…") }
+        if let p = model.preparing { return L("Preparing %@…", p.title) }
+        if on, let n = model.catchUpSeconds { return L("Video starts in %@ s", "\(n)") }
+        if model.enabled && model.mode.separation == nil { return L("Download needed for Best") }
+        if model.enabled && !model.stats.running { return L("Starting…") }
+        if on { return L("Removing the music") }
+        return L("Off. Sound plays normally")
     }
 
     // MARK: at most one gentle notice at a time
@@ -102,32 +103,32 @@ struct MenuView: View {
             notice("exclamationmark.triangle.fill", .orange, e, nil, nil)
         } else if model.enabled && model.audioPermission == .denied {
             // macOS says we may not hear other apps: say so plainly and go straight to the setting.
-            notice("hand.raised.fill", .orange, "Vocalizer isn't allowed to hear other apps yet. Turn on Vocalizer under System Audio Recording.", "Open Settings") {
+            notice("hand.raised.fill", .orange, L("Vocalizer isn't allowed to hear other apps yet. Turn on Vocalizer under System Audio Recording."), L("Open Settings")) {
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture")!)
             }
         } else if on && model.audioPermission == .unknown && model.silentFor > 8 && model.sources.contains(where: \.isPlaying) {
             // Permission not decided yet (macOS asks on first use) and nothing arrives: point at the prompt.
-            notice("hand.raised.fill", .orange, "No sound yet. If macOS asked about System Audio Recording, click Allow.", nil, nil)
+            notice("hand.raised.fill", .orange, L("No sound yet. If macOS asked about System Audio Recording, click Allow."), nil, nil)
         } else if model.mode == .supreme && !model.supremeReady {
             if let p = model.supremeProgress {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Downloading Best quality…").font(.system(size: 12))
+                    Text(L("Downloading Best quality…")).font(.system(size: 12))
                     ProgressView(value: p).controlSize(.small)
                 }
                 .padding(10).background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
                 .padding(.horizontal, 16).padding(.bottom, 12)
             } else {
-                notice("arrow.down.circle.fill", .accentColor, "Best quality needs a one-time 400 MB download.", "Download") { model.downloadSupreme() }
+                notice("arrow.down.circle.fill", .accentColor, L("Best quality needs a one-time 400 MB download."), L("Download")) { model.downloadSupreme() }
             }
         } else if model.syncVideo && !model.driverInstalled {
-            notice("film", .accentColor, "Install the Vocalizer audio device so videos stay in sync.", "Install") { model.installDriver() }
+            notice("film", .accentColor, L("Install the Vocalizer audio device so videos stay in sync."), L("Install")) { model.installDriver() }
         } else if model.driverInstalled && model.driverOutdated {
-            notice("film", .accentColor, "A newer audio device came with this update.", "Update") { model.installDriver() }
+            notice("film", .accentColor, L("A newer audio device came with this update."), L("Update")) { model.installDriver() }
         } else if let v = model.updater.ready {
-            notice("sparkles", .accentColor, "Vocalizer \(v) is ready. It installs when nothing is playing.", "Install now") { model.updater.installReadyUpdate() }
+            notice("sparkles", .accentColor, L("Vocalizer %@ is ready. It installs when nothing is playing.", v), L("Install now")) { model.updater.installReadyUpdate() }
         } else if let v = model.updater.available {
-            notice("sparkles", .accentColor, model.updater.installing ? "Updating to Vocalizer \(v)…" : "Vocalizer \(v) is available.",
-                   model.updater.installing ? nil : "Update") { model.updater.installAvailable() }
+            notice("sparkles", .accentColor, model.updater.installing ? L("Updating to Vocalizer %@…", v) : L("Vocalizer %@ is available.", v),
+                   model.updater.installing ? nil : L("Update")) { model.updater.installAvailable() }
         }
     }
 
@@ -186,7 +187,7 @@ struct MenuView: View {
     private var outputRow: some View {
         HStack(spacing: 8) {
             Image(systemName: "speaker.wave.2.fill").foregroundStyle(.secondary).frame(width: 18)
-            Text("Plays on").font(.system(size: 12.5)).foregroundStyle(.secondary)
+            Text(L("Plays on")).font(.system(size: 12.5)).foregroundStyle(.secondary)
             Spacer()
             Picker("", selection: Binding(get: { model.currentOutputUID ?? "" }, set: { model.choose(output: $0) })) {
                 ForEach(model.outputs) { o in Text(o.name).tag(o.id) }
@@ -203,16 +204,16 @@ struct MenuView: View {
             HStack(spacing: 8) {
                 Image(systemName: model.muteSwearWords ? "speaker.slash.fill" : "speaker.slash")
                     .foregroundStyle(model.muteSwearWords ? Color.accentColor : .secondary).frame(width: 18)
-                Text("Mute swear words").font(.system(size: 12.5))
+                Text(L("Mute swear words")).font(.system(size: 12.5))
                 Spacer()
                 if model.muteSwearWords && on {
                     Group {
                         if s.profanityPreparing {
-                            HStack(spacing: 4) { ProgressView().controlSize(.mini); Text("Getting ready") }
+                            HStack(spacing: 4) { ProgressView().controlSize(.mini); Text(L("Getting ready")) }
                         } else if s.profanityError != nil {
-                            Text("Unavailable")
+                            Text(L("Unavailable"))
                         } else if s.profanityFilter {
-                            Text(s.wordsCaught == 0 ? "Listening" : "\(s.wordsCaught) muted")
+                            Text(s.wordsCaught == 0 ? L("Listening") : L("%@ muted", "\(s.wordsCaught)"))
                         }
                     }
                     .font(.system(size: 11)).foregroundStyle(.secondary)
@@ -227,16 +228,16 @@ struct MenuView: View {
     }
 
     private var swearHint: String {
-        if let e = model.stats.profanityError, model.muteSwearWords { return "Speech recognition isn't available: \(e)" }
+        if let e = model.stats.profanityError, model.muteSwearWords { return L("Speech recognition isn't available: %@", "\(e)") }
         switch model.mode {
         case .live, .ultra, .balanced:
             return model.fastOnly
-                ? "Fast is too quick: words play before they're recognized. Turn off Fast only and use Best or Clean."
-                : "This mode is too quick: words play before they're recognized. Use Best or Clean."
+                ? L("Fast is too quick: words play before they're recognized. Turn off Fast only and use Best or Clean.")
+                : L("This mode is too quick: words play before they're recognized. Use Best or Clean.")
         case .quality:
-            return "Catches most swear words, sometimes with a bit of the next word. Best is more precise."
+            return L("Catches most swear words, sometimes with a bit of the next word. Best is more precise.")
         case .supreme:
-            return "Catches nearly every swear word, precisely. Recognized on this Mac."
+            return L("Catches nearly every swear word, precisely. Recognized on this Mac.")
         }
     }
 
@@ -247,7 +248,7 @@ struct MenuView: View {
             Button { withAnimation(.easeInOut(duration: 0.2)) { showSettings.toggle() } } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "gearshape").foregroundStyle(.secondary).frame(width: 18)
-                    Text("Settings").font(.system(size: 12.5)).foregroundStyle(.secondary)
+                    Text(L("Settings")).font(.system(size: 12.5)).foregroundStyle(.secondary)
                     Spacer()
                     Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(showSettings ? 90 : 0))
@@ -258,20 +259,20 @@ struct MenuView: View {
 
             if showSettings {
                 VStack(alignment: .leading, spacing: 12) {
-                    settingToggle("Fast only", "Hide the other modes and always use Fast.", $model.fastOnly)
-                    settingToggle("Keep video in sync", "Videos wait for the voice, so lips always match.", $model.syncVideo)
-                    settingToggle("Open at login", "Start Vocalizer when you log in.", $model.openAtLogin)
-                    settingToggle("Install updates automatically", "Off: Vocalizer tells you about new versions and asks first.",
+                    settingToggle(L("Fast only"), L("Hide the other modes and always use Fast."), $model.fastOnly)
+                    settingToggle(L("Keep video in sync"), L("Videos wait for the voice, so lips always match."), $model.syncVideo)
+                    settingToggle(L("Open at login"), L("Start Vocalizer when you log in."), $model.openAtLogin)
+                    settingToggle(L("Install updates automatically"), L("Off: Vocalizer tells you about new versions and asks first."),
                                   Binding(get: { model.updater.automaticallyInstalls }, set: { model.updater.automaticallyInstalls = $0 }))
                     if !model.fastOnly {
-                        settingToggle("Show countdown on screen", "While a video waits for the voice (Best, Clean).", $screenCountdown)
+                        settingToggle(L("Show countdown on screen"), L("While a video waits for the voice (Best, Clean)."), $screenCountdown)
                     }
                     if !model.syncActive {
                         HStack {
-                            Text("Only remove music from").font(.system(size: 12.5))
+                            Text(L("Only remove music from")).font(.system(size: 12.5))
                             Spacer()
                             Picker("", selection: $model.sourceID) {
-                                Text("All apps").tag(AudioSource.all.id)
+                                Text(L("All apps")).tag(AudioSource.all.id)
                                 Divider()
                                 ForEach(model.sources) { s in Text(s.isPlaying ? "\(s.name) ♪" : s.name).tag(s.id) }
                             }
@@ -299,10 +300,10 @@ struct MenuView: View {
 
     private var footer: some View {
         HStack {
-            Text("⌥⇧V turns it on or off").font(.system(size: 11)).foregroundStyle(.tertiary)
+            Text(L("⌥⇧V turns it on or off")).font(.system(size: 11)).foregroundStyle(.tertiary)
             Spacer()
             // Quitting keeps "on" remembered, so it resumes next launch.
-            Button("Quit") { NSApp.terminate(nil) }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(.secondary)
+            Button(L("Quit")) { NSApp.terminate(nil) }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(.secondary)
         }
     }
 }
@@ -315,15 +316,15 @@ struct StatusView: View {
         let s = model.stats
         if s.running {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Details").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
-                Text(String(format: "Delay %.2f s · %@ · %@", s.totalLatencyMs / 1000,
-                            s.realTimeFactor > 0 ? String(format: "%.0f× faster than real time", 1 / s.realTimeFactor) : "starting",
-                            s.underruns == 0 ? "no glitches" : "\(s.underruns) glitches"))
+                Text(L("Details")).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                Text(L("Delay %@ s · %@ · %@", String(format: "%.2f", s.totalLatencyMs / 1000),
+                            s.realTimeFactor > 0 ? L("%@× faster than real time", String(format: "%.0f", 1 / s.realTimeFactor)) : L("starting"),
+                            s.underruns == 0 ? L("no glitches") : L("%@ glitches", "\(s.underruns)")))
                     .font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
-                Text("Version \(model.updater.current)").font(.system(size: 11)).foregroundStyle(.tertiary)
+                Text(L("Version %@", model.updater.current)).font(.system(size: 11)).foregroundStyle(.tertiary)
             }
         } else {
-            Text("Version \(model.updater.current)").font(.system(size: 11)).foregroundStyle(.tertiary)
+            Text(L("Version %@", model.updater.current)).font(.system(size: 11)).foregroundStyle(.tertiary)
         }
     }
 }

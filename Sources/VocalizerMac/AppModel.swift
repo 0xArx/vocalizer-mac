@@ -19,11 +19,11 @@ enum Mode: String, CaseIterable, Identifiable {
     }
     var title: String {
         switch self {
-        case .ultra: "Calls"
-        case .live: "Fast"
-        case .balanced: "Balanced"
-        case .quality: "Clean"
-        case .supreme: "Best"
+        case .ultra: L("Calls")
+        case .live: L("Fast")
+        case .balanced: L("Balanced")
+        case .quality: L("Clean")
+        case .supreme: L("Best")
         }
     }
     var symbol: String {
@@ -46,13 +46,13 @@ enum Mode: String, CaseIterable, Identifiable {
         }
     }
     func hint(delaySeconds d: Double) -> String {
-        let delay = d < 1 ? String(format: "%.1f s", d) : String(format: "%.0f s", d.rounded())
+        let delay = L("%@ s", d < 1 ? String(format: "%.1f", d) : String(format: "%.0f", d.rounded()))
         switch self {
-        case .ultra: return "Lowest delay, for calls and games (\(delay)). Fast sounds cleaner for videos and talks."
-        case .live: return "For videos, talks and music. \(delay) behind."
-        case .balanced: return "A little cleaner than Fast. \(delay) behind."
-        case .quality: return "Cleaner voices, for music apps. \(delay) behind."
-        case .supreme: return "The cleanest voices. \(delay) behind, videos wait for it."
+        case .ultra: return L("Lowest delay, for calls and games (%@). Fast sounds cleaner for videos and talks.", delay)
+        case .live: return L("For videos, talks and music. %@ behind.", delay)
+        case .balanced: return L("A little cleaner than Fast. %@ behind.", delay)
+        case .quality: return L("Cleaner voices, for music apps. %@ behind.", delay)
+        case .supreme: return L("The cleanest voices. %@ behind, videos wait for it.", delay)
         }
     }
     /// Expected capture-to-speaker delay: model delay + safety buffer + ~35 ms of audio IO.
@@ -90,7 +90,7 @@ final class AppModel: ObservableObject {
             do {
                 if openAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             } catch {
-                self.error = "Open at login: \(error.localizedDescription)"
+                self.error = L("Open at login: %@", error.localizedDescription)
                 openAtLogin = SMAppService.mainApp.status == .enabled
             }
         }
@@ -143,7 +143,7 @@ final class AppModel: ObservableObject {
         SupremeModel.download(progress: { [weak self] p in self?.supremeProgress = p }) { [weak self] err in
             guard let self else { return }
             self.supremeProgress = nil
-            if let err { self.error = "Supreme download: \(err.localizedDescription)"; return }
+            if let err { self.error = L("Best download: %@", err.localizedDescription); return }
             self.supremeReady = true
             self.status = "Preparing Supreme…"
             // Load + warm up on the GPU off the main thread, then (re)start in Supreme.
@@ -208,7 +208,7 @@ final class AppModel: ObservableObject {
                     }
                 }
             } catch {
-                await MainActor.run { self.error = "Model failed to load: \(error.localizedDescription)" }
+                await MainActor.run { self.error = L("Model failed to load: %@", error.localizedDescription) }
             }
         }
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -532,7 +532,7 @@ final class AppModel: ObservableObject {
                     let failure = message
                     await MainActor.run {
                         self.preparing = nil
-                        if let failure { self.error = "Best mode: \(failure)"; return }
+                        if let failure { self.error = L("Best mode: %@", "\(failure)"); return }
                         if self.enabled && self.mode == .supreme { self.apply() }
                     }
                 }
@@ -607,14 +607,14 @@ final class AppModel: ObservableObject {
     /// Installs the bundled Vocalizer.driver (asks for the admin password via the macOS dialog).
     func installDriver() {
         guard let driver = Bundle.main.url(forResource: "Vocalizer", withExtension: "driver") else {
-            error = "Driver missing from the app bundle"; return
+            error = L("The audio device is missing from the app. Reinstall Vocalizer."); return
         }
         let dest = "/Library/Audio/Plug-Ins/HAL/Vocalizer.driver"
         let cmd = "rm -rf '\(dest)' && cp -R '\(driver.path)' '\(dest)' && chown -R root:wheel '\(dest)' && killall coreaudiod"
         let script = "do shell script \"\(cmd)\" with administrator privileges with prompt \"Vocalizer wants to install its audio device so video stays in sync.\""
         var err: NSDictionary?
         NSAppleScript(source: script)?.executeAndReturnError(&err)
-        if let err { error = (err[NSAppleScript.errorMessage] as? String) ?? "Install cancelled"; return }
+        if let err { error = (err[NSAppleScript.errorMessage] as? String) ?? L("Install cancelled"); return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.driverInstalled = AudioProcesses.vocalizerDevice() != nil
             self?.driverOutdated = AppModel.checkDriverOutdated()
@@ -633,13 +633,13 @@ final class AppModel: ObservableObject {
         }
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = inTrash ? "Vocalizer is in the Bin. Remove the rest too?" : "Uninstall Vocalizer?"
+        alert.messageText = inTrash ? L("Vocalizer is in the Bin. Remove the rest too?") : L("Uninstall Vocalizer?")
         alert.informativeText = inTrash
-            ? "Also remove its audio device, the downloaded models and its settings, so nothing is left behind. Your speakers go back to normal. macOS asks for your password to remove the audio device."
-            : "This removes Vocalizer, its audio device, the downloaded models and its settings. Your speakers go back to normal. macOS asks for your password to remove the audio device."
+            ? L("Also remove its audio device, the downloaded models and its settings, so nothing is left behind. Your speakers go back to normal. macOS asks for your password to remove the audio device.")
+            : L("This removes Vocalizer, its audio device, the downloaded models and its settings. Your speakers go back to normal. macOS asks for your password to remove the audio device.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: inTrash ? "Remove Everything" : "Uninstall")
-        alert.addButton(withTitle: inTrash ? "Just Quit" : "Cancel")
+        alert.addButton(withTitle: inTrash ? L("Remove Everything") : L("Uninstall"))
+        alert.addButton(withTitle: inTrash ? L("Just Quit") : L("Cancel"))
         alert.buttons.first?.hasDestructiveAction = true
         guard alert.runModal() == .alertFirstButtonReturn else {
             if inTrash { NSApp.terminate(nil) }
@@ -658,7 +658,7 @@ final class AppModel: ObservableObject {
             var err: NSDictionary?
             NSAppleScript(source: script)?.executeAndReturnError(&err)
             if err != nil {
-                error = "Uninstall stopped: the audio device was not removed (password dialog cancelled)."
+                error = L("Uninstall stopped: the audio device was not removed (password dialog cancelled).")
                 return
             }
         }

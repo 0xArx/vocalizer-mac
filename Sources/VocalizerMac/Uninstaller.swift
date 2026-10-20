@@ -57,8 +57,8 @@ final class Uninstaller: NSObject {
         let picked = urls.contains { Bundle(url: $0)?.bundleIdentifier == mine }
         guard picked || urls.isEmpty else {
             let alert = NSAlert()
-            alert.messageText = "That isn't Vocalizer"
-            alert.informativeText = "Uninstall Vocalizer only removes Vocalizer. Right-click Vocalizer in your Applications folder to use it."
+            alert.messageText = L("That isn't Vocalizer")
+            alert.informativeText = L("Uninstall Vocalizer only removes Vocalizer. Right-click Vocalizer in your Applications folder to use it.")
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
             return
