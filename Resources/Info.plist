@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.3.7</string>
+	<string>0.3.8</string>
 	<key>CFBundleVersion</key>
-	<string>22</string>
+	<string>23</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.2</string>
 	<key>LSUIElement</key>
@@ -51,7 +51,7 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://vocalizer-mac.vercel.app/appcast.xml</string>
+	<string>https://getvocalizer.com/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>yhoLB0XYkSA8xqDHvBxerKmBYtRCJYDQHvM9uvZA7pA=</string>
 	<key>SUScheduledCheckInterval</key>

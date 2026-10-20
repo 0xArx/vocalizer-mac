@@ -1,7 +1,7 @@
 #!/bin/bash
 # Vocalizer installer: removes music from any app on your Mac and keeps the voices.
 #
-#   curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/install.sh | bash
+#   curl -fsSL https://getvocalizer.com/install.sh | bash
 #
 # Options (after `bash -s --` when piping):
 #   --from-source   build from source instead of downloading the prebuilt app (needs Xcode or its command line tools)
@@ -90,6 +90,6 @@ fi
 
 say "Installed. Vocalizer lives in the menu bar (a waveform in a circle)."
 echo "    First time you switch it on, macOS asks to allow System Audio Recording: click Allow."
-echo "    Uninstall: curl -fsSL https://raw.githubusercontent.com/$REPO/main/uninstall.sh | bash"
+echo "    Uninstall: right-click Vocalizer in Applications › Services › Uninstall Vocalizer, or: curl -fsSL https://getvocalizer.com/uninstall.sh | bash"
 [[ $LAUNCH == 1 ]] && open "$APP_DEST"
 exit 0

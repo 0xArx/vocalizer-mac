@@ -6,7 +6,7 @@
 any app. It runs entirely on your Mac (Neural Engine), and with the optional audio device it keeps video lips in
 sync with the voice.
 
-**Website and download:** [vocalizer-mac.vercel.app](https://vocalizer-mac.vercel.app)
+**Website and download:** [getvocalizer.com](https://getvocalizer.com)
 
 <p align="center"><img src="docs-menu.png" width="330" alt="Vocalizer menu"></p>
 
@@ -15,7 +15,7 @@ sync with the voice.
 Needs an **Apple silicon Mac** (M1 or later) on **macOS 14.2+**. Paste into Terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/install.sh | bash
+curl -fsSL https://getvocalizer.com/install.sh | bash
 ```
 
 That downloads the latest release, puts **Vocalizer** in Applications, installs the Vocalizer audio device (macOS
@@ -42,7 +42,7 @@ github.com/0xArx/vocalizer-mac". It follows [AGENTS.md](AGENTS.md). There is als
 
 </details>
 
-**Uninstall:** in Finder, right-click Vocalizer in Applications › **Services › Uninstall Vocalizer**, or drag it to the Bin (it offers to remove its audio device and settings too), or right-click its menu bar icon › **Uninstall Vocalizer…** (removes the app, its audio device, models and settings). Or: `curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash`
+**Uninstall:** in Finder, right-click Vocalizer in Applications › **Services › Uninstall Vocalizer**, or drag it to the Bin (it offers to remove its audio device and settings too), or right-click its menu bar icon › **Uninstall Vocalizer…** (removes the app, its audio device, models and settings). Or: `curl -fsSL https://getvocalizer.com/uninstall.sh | bash`
 
 ## Using it
 
@@ -127,7 +127,7 @@ attack on trusted software is rare but real, which is why those keys are kept of
   warning sign.
 - It could connect to the internet without asking, because macOS doesn't block outgoing connections by default. A
   free, open-source firewall like [LuLu](https://objective-see.org/products/lulu.html) shows you when an app
-  connects somewhere and lets you block it. Vocalizer itself only ever contacts `vocalizer-mac.vercel.app`
+  connects somewhere and lets you block it. Vocalizer itself only ever contacts `getvocalizer.com`
   (the update list) and `github.com` (downloads).
 
 **Checking which of your apps update themselves:**

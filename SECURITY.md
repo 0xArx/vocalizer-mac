@@ -32,5 +32,5 @@ this project:
 ## What Vocalizer can access
 
 Vocalizer needs one macOS permission, **System Audio Recording**, to hear what your Mac plays. Audio is processed in
-memory on your Mac and is never recorded, stored or sent anywhere. The app only contacts `vocalizer-mac.vercel.app`
+memory on your Mac and is never recorded, stored or sent anywhere. The app only contacts `getvocalizer.com`
 (the update list) and `github.com` (downloads). More detail: [README › Updates and security](README.md#updates-and-security).

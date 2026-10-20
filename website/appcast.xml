@@ -2,7 +2,7 @@
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
     <title>Vocalizer</title>
-    <link>https://vocalizer-mac.vercel.app/appcast.xml</link>
+    <link>https://getvocalizer.com/appcast.xml</link>
     <description>Updates for Vocalizer for Mac</description>
     <language>en</language>
     <item>

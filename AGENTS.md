@@ -20,7 +20,7 @@ sw_vers -productVersion   # must be 14.2 or later
 ### 2. Run the installer
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/install.sh | bash
+curl -fsSL https://getvocalizer.com/install.sh | bash
 ```
 
 It downloads the latest prebuilt release, copies `Vocalizer.app` to `/Applications`, installs the audio device to
@@ -71,7 +71,7 @@ app bundles can hold the System Audio Recording permission.
 In Finder: right-click Vocalizer in Applications › **Services › Uninstall Vocalizer**, or drag it to the Bin (it offers to remove the rest). Or right-click the menu bar icon › **Uninstall Vocalizer…**. `VOCALIZER_UNINSTALL_DRYRUN=1` makes uninstall only log (for testing). Or from the Terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash
+curl -fsSL https://getvocalizer.com/uninstall.sh | bash
 ```
 
 ### Troubleshooting
@@ -118,7 +118,7 @@ Layout:
 | `Driver/` | `BlackHole.c` (GPL-3.0) + `patch.py` that turns it into the Vocalizer device |
 | `Models/` | Core ML packages (32 / 64 / 256-frame windows); `tools/convert.py` regenerates them from ONNX |
 | `tools/` | Python: model conversion, test fixtures (MUSDB18 samples), loopback analysis; `make-icon.swift` builds the app icon from `Resources/brand/logo.png` |
-| `website/` | the static site at vocalizer-mac.vercel.app (Vercel project `vocalizer`); deploy with `npx vercel deploy --prod` from that folder |
+| `website/` | the static site at getvocalizer.com (Vercel project `vocalizer`; the old vocalizer-mac.vercel.app still serves it, including the appcast that 0.3.5–0.3.7 read); deploy with `npx vercel deploy --prod` from that folder |
 
 Rules that matter:
 

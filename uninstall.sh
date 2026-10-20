@@ -1,6 +1,6 @@
 #!/bin/bash
 # Removes Vocalizer, its audio device and its settings.
-#   curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash
+#   curl -fsSL https://getvocalizer.com/uninstall.sh | bash
 set -euo pipefail
 APP="/Applications/Vocalizer.app"
 DRIVER="/Library/Audio/Plug-Ins/HAL/Vocalizer.driver"

@@ -24,7 +24,7 @@ SIG=$("$SPARKLE/sign_update" --ed-key-file .signing/sparkle-private.key "$ZIP")
 URL="https://github.com/$REPO/releases/download/v$VER/Vocalizer-macOS.zip"
 
 BODY=$(python3 -c 'import json,sys; v,n=sys.argv[1:]; print(json.dumps({"tag_name":"v"+v,"target_commitish":"main","name":"Vocalizer "+v,
-  "body":"\n".join("- "+l.strip().lstrip("-").strip() for l in n.splitlines() if l.strip())+"\n\nSigned and notarized. Apple silicon, macOS 14.2 or later. Vocalizer updates itself; new installs: https://vocalizer-mac.vercel.app"}))' "$VER" "$NOTES")
+  "body":"\n".join("- "+l.strip().lstrip("-").strip() for l in n.splitlines() if l.strip())+"\n\nSigned and notarized. Apple silicon, macOS 14.2 or later. Vocalizer updates itself; new installs: https://getvocalizer.com"}))' "$VER" "$NOTES")
 ID=$(curl -fsS -X POST -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/$REPO/releases -d "$BODY" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 curl -fsS -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/zip" --data-binary @"$ZIP" \
   "https://uploads.github.com/repos/$REPO/releases/$ID/assets?name=Vocalizer-macOS.zip" >/dev/null
@@ -33,7 +33,7 @@ curl -fsSIL -o /dev/null "$URL"
 
 python3 tools/appcast.py website/appcast.xml "$BUILD" "$VER" "$URL" "$SIG" "$NOTES"
 (cd website && npx -y vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" >/dev/null 2>&1)
-curl -fsS https://vocalizer-mac.vercel.app/appcast.xml | grep -q "<sparkle:version>$BUILD<" && echo "appcast live: $VER ($BUILD)"
+curl -fsS https://getvocalizer.com/appcast.xml | grep -q "<sparkle:version>$BUILD<" && echo "appcast live: $VER ($BUILD)"
 
 git add website/appcast.xml Resources/Info.plist
 git -c user.name=0xArx -c user.email=34143289+0xArx@users.noreply.github.com commit -qm "Release $VER" || true

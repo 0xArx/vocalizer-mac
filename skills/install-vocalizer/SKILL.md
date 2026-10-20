@@ -11,7 +11,7 @@ Short version:
 1. **Check:** `uname -m` is `arm64` and `sw_vers -productVersion` is 14.2 or later. Otherwise stop: unsupported.
 2. **Install:**
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/install.sh | bash
+   curl -fsSL https://getvocalizer.com/install.sh | bash
    ```
    Add `bash -s -- --no-driver` to skip the audio device (no video sync), or `--from-source` to build locally.
 3. **Tell the user** (these need them, not you):
@@ -20,6 +20,6 @@ Short version:
    - click the Vocalizer icon (a waveform in a circle) in the menu bar and flip the switch (Fast mode is the default).
    - to remove it later: right-click Vocalizer in Applications › Services › Uninstall Vocalizer (or drag it to the Bin)
 4. **Verify:** `pgrep -lf /Applications/Vocalizer.app` and `system_profiler SPAudioDataType | grep -A3 "Vocalizer:"`.
-5. **Uninstall:** `curl -fsSL https://raw.githubusercontent.com/0xArx/vocalizer-mac/main/uninstall.sh | bash`
+5. **Uninstall:** `curl -fsSL https://getvocalizer.com/uninstall.sh | bash`
 
 Copy this folder to `~/.claude/skills/` (or your agent's skills folder) to make it available everywhere.
