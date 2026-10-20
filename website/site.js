@@ -1,5 +1,20 @@
-// Vocalizer site: the hero demo, the delay scale, copy, and the latest release number.
+// Vocalizer site: the theme switch, the hero demo, the delay scale, copy, and the latest release number.
 document.documentElement.classList.add("js");
+
+// Light/dark switch: flips away from what's showing now and remembers it (theme.js re-applies it on load).
+(() => {
+  const root = document.documentElement;
+  const light = window.matchMedia("(prefers-color-scheme: light)");
+  const showing = () => root.dataset.theme || (light.matches ? "light" : "dark");
+  const announce = () => document.dispatchEvent(new Event("themechange"));
+  document.querySelectorAll(".theme").forEach((b) => b.addEventListener("click", () => {
+    const next = showing() === "dark" ? "light" : "dark";
+    root.dataset.theme = next;
+    try { localStorage.setItem("theme", next); } catch {}
+    announce();
+  }));
+  light.addEventListener("change", announce);
+})();
 
 (() => {
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -12,6 +27,13 @@ document.documentElement.classList.add("js");
   const hero = document.getElementById("hero");
   if (canvas && sw) {
     const ctx = canvas.getContext("2d");
+    let colors = [];
+    const readColors = () => {
+      const cs = getComputedStyle(document.documentElement);
+      colors = ["--wave-a", "--wave-b", "--wave-c"].map((v) => cs.getPropertyValue(v).trim() || "#8b3dff");
+    };
+    readColors();
+    document.addEventListener("themechange", () => { readColors(); if (reduce) draw(); });
     let on = false, music = 1, t = 0, w = 0, h = 0, last = 0, visible = true, raf = 0, touched = false;
 
     const size = () => {
@@ -45,7 +67,7 @@ document.documentElement.classList.add("js");
       // Voice: one continuous line that is always there; it brightens as the music leaves.
       const clarity = 1 - music;
       const g = ctx.createLinearGradient(0, 0, w, 0);
-      g.addColorStop(0, "#7c3aed"); g.addColorStop(0.5, "#a96bff"); g.addColorStop(1, "#dcc0ff");
+      g.addColorStop(0, colors[0]); g.addColorStop(0.5, colors[1]); g.addColorStop(1, colors[2]);
       ctx.save();
       ctx.globalAlpha = 0.55 + 0.45 * clarity;
       ctx.shadowColor = "rgba(160, 100, 255, 0.8)";
@@ -75,7 +97,7 @@ document.documentElement.classList.add("js");
     const set = (value) => {
       on = value;
       sw.setAttribute("aria-checked", String(on));
-      label.textContent = on ? "Vocalizer on" : "Vocalizer off";
+      label.textContent = on ? (label.dataset.on || "Vocalizer on") : (label.dataset.off || "Vocalizer off");
       hero.classList.toggle("music", !on);
       if (reduce) { music = on ? 0 : 1; draw(); }
     };
@@ -169,9 +191,10 @@ document.documentElement.classList.add("js");
   const copy = document.getElementById("copy");
   if (copy) {
     copy.addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(document.getElementById("cmd").textContent); copy.textContent = "Copied"; }
-      catch { copy.textContent = "Select it"; }
-      setTimeout(() => (copy.textContent = "Copy"), 1600);
+      const original = copy.textContent;
+      try { await navigator.clipboard.writeText(document.getElementById("cmd").textContent); copy.textContent = copy.dataset.done || "Copied"; }
+      catch { copy.textContent = copy.dataset.fail || "Select it"; }
+      setTimeout(() => (copy.textContent = original), 1600);
     });
   }
 
@@ -181,9 +204,9 @@ document.documentElement.classList.add("js");
     .then((rel) => {
       if (!rel || !rel.tag_name) return;
       const v = rel.tag_name.replace(/^v/, "");
-      document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "Version " + v));
+      document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = (el.dataset.prefix ?? "Version ") + v));
       const asset = (rel.assets || []).find((a) => a.name === "Vocalizer-macOS.zip");
-      if (asset) document.querySelectorAll("[data-size]").forEach((el) => (el.textContent = Math.round(asset.size / 1e6) + " MB"));
+      if (asset) document.querySelectorAll("[data-size]").forEach((el) => (el.textContent = Math.round(asset.size / 1e6) + (el.dataset.unit ?? " MB")));
     })
     .catch(() => {});
 })();
