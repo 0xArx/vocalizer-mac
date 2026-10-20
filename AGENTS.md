@@ -115,11 +115,11 @@ Layout:
 | `Sources/VocalizerCore/RoformerSeparator.swift`, `SupremeModel.swift` | Supreme mode (MelBand RoFormer on the GPU) and its on-demand download (`models-v1` release) |
 | `Sources/VocalizerMac/Updater.swift`, `SelfInstaller.swift` | Sparkle finds updates; SelfInstaller installs them by swapping the whole bundle after checking the EdDSA signature (SUPublicEDKey) and the Developer ID team, because macOS App Management blocks writes inside a notarized app and Sparkle would ask for an admin password. Test hooks: `VOCALIZER_FEED_URL`, `VOCALIZER_UPDATE_NOW`, `VOCALIZER_TEST_CLICK_UPDATE` |
 | `Sources/VocalizerCore/AudioProcesses.swift` | process list, devices, volume, the Vocalizer device's `'vlat'` latency property |
-| `Sources/VocalizerMac/` | SwiftUI menu bar app; `main.swift` also has `--selftest`, `--sync-run`, `--snapshot`, `--list` |
+| `Sources/VocalizerMac/` | SwiftUI menu bar app (all UI text through `L()`; Arabic in `Resources/Localization/ar.lproj`, English text is the key); `main.swift` also has `--selftest`, `--sync-run`, `--snapshot`, `--list` |
 | `Driver/` | `BlackHole.c` (GPL-3.0) + `patch.py` that turns it into the Vocalizer device |
 | `Models/` | Core ML packages (32 / 64 / 256-frame windows); `tools/convert.py` regenerates them from ONNX |
 | `tools/` | Python: model conversion, test fixtures (MUSDB18 samples), loopback analysis; `make-icon.swift` builds the app icon from `Resources/brand/logo.png` |
-| `website/` | the static site at getvocalizer.com (Vercel project `vocalizer`; the old vocalizer-mac.vercel.app still serves it, including the appcast that 0.3.5–0.3.7 read); deploy with `npx vercel deploy --prod` from that folder |
+| `website/` | the static site at getvocalizer.com (Vercel project `vocalizer`; the old vocalizer-mac.vercel.app still serves it, including the appcast that 0.3.5–0.3.7 read); deploy with `npx vercel deploy --prod` from that folder. `website/ar/` is generated: edit the English pages, then `python3 tools/ar_site.py` |
 
 Rules that matter:
 

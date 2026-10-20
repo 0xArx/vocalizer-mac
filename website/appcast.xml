@@ -14,7 +14,6 @@
       <description><![CDATA[
         <ul>
           <li>Vocalizer now speaks Arabic: if your Mac is set to Arabic, every menu and window is in Arabic and laid out right to left</li>
-          <li>Menu bar icon is a clean wave</li>
         </ul>
       ]]></description>
       <enclosure url="https://github.com/0xArx/vocalizer-mac/releases/download/v0.3.10/Vocalizer-macOS.zip" sparkle:edSignature="qsl9B/07i92neFpRHLNEUD+rZP9aZIj0oEjqpil1morS8Adl7lmgJeVr25U3zPrvYPf0WgC/+RVw8XBYTBXlBg==" length="111224873" type="application/octet-stream"/>
