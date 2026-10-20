@@ -10,7 +10,7 @@ common={
  "Open it":"افتحه","Switch it on":"شغّله","Allow":"سماح","Mute swear words":"كتم الألفاظ البذيئة",
  "privacy policy":"سياسة الخصوصية","Download Vocalizer":"تنزيل Vocalizer","110 MB":"110 ميغابايت",
  "© 2026 Vocalizer. Open source under the MIT license.":"© 2026 Vocalizer. مفتوح المصدر بترخيص MIT.",
- "Privacy":"الخصوصية","Terms":"الشروط","Releases":"الإصدارات","Support":"الدعم","Source":"الشيفرة المصدرية","Home":"الرئيسية",
+ "Privacy":"الخصوصية","Terms":"الشروط","Releases":"الإصدارات","Support":"الدعم","Source":"الشيفرة المصدرية","Licenses":"التراخيص","Home":"الرئيسية",
  "Install":"تثبيت","Switch between light and dark":"التبديل بين الوضع الفاتح والداكن","Version 0.3.9":"الإصدار 0.3.9","Fast":"سريع","Clean":"نقي","Best":"الأفضل","Calls":"مكالمات",
 }
 index={

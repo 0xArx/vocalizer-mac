@@ -381,4 +381,5 @@ open -W -n build/Vocalizer.app --args --selftest app:com.apple.Music 12 live $PW
   team (MIT, credit requested), converted to Core ML here. MDX-Net architecture by KUIELab.
 - **Calls mode:** [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) by Hendrik Schröter (MIT / Apache-2.0).
 - **Updates:** [Sparkle](https://sparkle-project.org) (MIT).
+- Full license texts: [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt), also inside the app (right-click the menu bar icon › Licenses…) and at [getvocalizer.com/licenses](https://getvocalizer.com/licenses).
 - Test data (not included): MUSDB18 7-second samples.
