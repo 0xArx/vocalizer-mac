@@ -298,3 +298,31 @@ footer a { text-decoration: none; color: var(--muted); transition: color 150ms e
 .w-fast { --w: 23.6%; --d: 70ms; }
 .w-clean { --w: 52.7%; --d: 140ms; }
 .w-best { --w: 98.6%; --d: 210ms; }
+
+/* /muslim */
+.salam { font: 600 clamp(20px, 2.6vw, 26px)/1.4 "Geeza Pro", "SF Arabic", "Noto Naskh Arabic", system-ui, sans-serif; color: var(--lav); margin: 0 0 14px; }
+/* A quiet eight-point star lattice behind the hero, drawn in the page's own lavender. */
+body.muslim .hero::after {
+  content: ""; position: absolute; inset: 0; z-index: -2; opacity: 0.07; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%23c9a6ff' stroke-width='1'%3E%3Crect x='22' y='22' width='36' height='36'/%3E%3Crect x='22' y='22' width='36' height='36' transform='rotate(45 40 40)'/%3E%3Ccircle cx='40' cy='40' r='9'/%3E%3Cpath d='M0 40h4M76 40h4M40 0v4M40 76v4'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 75%);
+}
+.uses { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 56px; margin-top: 56px; }
+.use { border-top: 1px solid var(--line); padding: 22px 0 24px; }
+.use h3 { margin: 0 0 6px; font-size: 19px; font-weight: 700; }
+.use p { margin: 0; color: var(--muted); font-size: 15.5px; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.checks li { display: grid; grid-template-columns: 28px 1fr; gap: 16px; padding: 20px 0; border-top: 1px solid var(--line); }
+.checks li:last-child { border-bottom: 1px solid var(--line); }
+.checks h3 { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
+.checks p { margin: 0; color: var(--muted); font-size: 15.5px; }
+.split.private { align-items: start; }
+.split.private > div:first-child { position: sticky; top: 120px; }
+@media (max-width: 900px) {
+  .uses { grid-template-columns: 1fr 1fr; column-gap: 40px; }
+  .split.private > div:first-child { position: static; }
+}
+@media (max-width: 640px) {
+  .uses { grid-template-columns: 1fr; }
+}

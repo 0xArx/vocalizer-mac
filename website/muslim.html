@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vocalizer for Muslims: remove music from everything on your Mac</title>
+  <meta name="description" content="For Muslims who keep away from music: Vocalizer removes the music from lectures, YouTube, reels, news and ads on your Mac and keeps the voices. Free, private, and fully on your Mac.">
+  <meta name="theme-color" content="#09060f">
+  <link rel="canonical" href="https://getvocalizer.com/muslim">
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="apple-touch-icon" href="/img/icon.png">
+  <meta property="og:title" content="Vocalizer: hear the knowledge, not the music">
+  <meta property="og:description" content="Removes music from everything your Mac plays, keeps the voices. Free, private, fully on your Mac.">
+  <meta property="og:image" content="https://getvocalizer.com/img/icon.png">
+  <meta property="og:type" content="website">
+  <link rel="preload" href="/fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/site.js" defer></script>
+</head>
+<body class="muslim">
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/img/icon.png" alt="" width="30" height="30">Vocalizer</a>
+    <nav class="nav" aria-label="Main">
+      <a href="#everywhere">Where it works</a>
+      <a href="#private">Privacy</a>
+      <a href="#questions">Questions</a>
+      <a class="btn small" href="/download">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero" id="hero">
+    <div class="wrap">
+      <div class="logo" role="img" aria-label="Vocalizer logo: a voice waveform in a glowing ring">
+        <img src="/img/logo-ring.jpg" alt="" width="220" height="220">
+        <svg class="wave" viewBox="0 0 1024 1024" aria-hidden="true">
+          <defs>
+            <filter id="neon" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b1"/>
+              <feGaussianBlur in="SourceGraphic" stdDeviation="22" result="b2"/>
+              <feFlood flood-color="#a24bff"/><feComposite in2="b2" operator="in" result="g2"/>
+              <feFlood flood-color="#c27bff"/><feComposite in2="b1" operator="in" result="g1"/>
+              <feMerge><feMergeNode in="g2"/><feMergeNode in="g1"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <linearGradient id="in-fade" x1="232" x2="462" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".22" stop-color="#fff"/><stop offset="1" stop-color="#fff"/>
+            </linearGradient>
+            <mask id="in-mask"><rect x="232" y="370" width="230" height="290" fill="url(#in-fade)"/></mask>
+            <linearGradient id="out-fade" x1="600" x2="800" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#fff"/><stop offset=".72" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+            </linearGradient>
+            <mask id="out-mask"><rect x="600" y="440" width="200" height="150" fill="url(#out-fade)"/></mask>
+          </defs>
+          <g filter="url(#neon)" fill="#fbeaff" stroke="#fbeaff">
+            <!-- In: music and voice tangled together, loud and random. -->
+            <g mask="url(#in-mask)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path class="in" d="M240 515H460" stroke-width="9"/>
+            </g>
+            <!-- The filter. -->
+            <rect class="b b1" x="466" y="440" width="15" height="150" rx="7.5" stroke="none"/>
+            <rect class="b b2" x="505" y="385" width="15" height="260" rx="7.5" stroke="none"/>
+            <rect class="b b3" x="543" y="430" width="15" height="175" rx="7.5" stroke="none"/>
+            <rect class="b b4" x="581" y="473" width="15" height="90" rx="7.5" stroke="none"/>
+            <!-- Out: just the voice, one clean line. -->
+            <path class="out" mask="url(#out-mask)" d="M606 515H796" fill="none" stroke-width="9" stroke-linecap="round"/>
+          </g>
+        </svg>
+      </div>
+
+      <p class="salam" lang="ar" dir="rtl">استمع إلى العلم، بلا موسيقى</p>
+      <h1>Hear the knowledge.<br><span class="accent">Not the music.</span></h1>
+      <p class="lede">For Muslims who keep away from music. Vocalizer takes the music out of everything your Mac plays, from lectures and reels to news and ads, and keeps the voices. It all happens on your Mac, and nothing ever leaves it.</p>
+      <div class="cta">
+        <a class="btn" href="/download"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.62c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.65.8-3.33.8-.7 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.63 1.11 8.8.73 1.06 1.6 2.25 2.75 2.2 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.7.71 2.87.69 1.19-.02 1.94-1.08 2.66-2.15.84-1.23 1.19-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.54ZM14.2 6.17c.6-.74 1.01-1.76.9-2.78-.87.04-1.93.58-2.55 1.31-.56.65-1.05 1.69-.92 2.69.97.08 1.96-.49 2.57-1.22Z"/></svg>Download free for Mac</a>
+        <a class="ghost" href="#private">How your privacy is protected</a>
+      </div>
+      <p class="meta"><span data-version>Version 0.3.9</span><span>Free, no ads</span><span>Apple silicon</span><span>macOS 14.2 or later</span></p>
+    </div>
+  </div>
+
+  <section id="everywhere">
+    <div class="wrap">
+      <h2>One switch. Music gone everywhere.</h2>
+      <p class="sub">You don't have to skip the talk because of its intro music, or mute a video and lose the words. Vocalizer works on your Mac's sound itself, so every app and every website is covered at once.</p>
+      <div class="uses">
+        <div class="use"><h3>Lectures and talks</h3><p>Islamic talks, courses and podcasts that open with music or play it underneath.</p></div>
+        <div class="use"><h3>YouTube, reels and shorts</h3><p>In Safari, Chrome or any browser, including Instagram, TikTok and Facebook on the web.</p></div>
+        <div class="use"><h3>News and documentaries</h3><p>Background scores and dramatic stings removed, the reporting and narration kept.</p></div>
+        <div class="use"><h3>Ads and trailers</h3><p>The jingles that sneak into everything, gone before they reach your ears.</p></div>
+        <div class="use"><h3>Nasheeds with instruments</h3><p>Keep the voices, lose the instruments, on the versions that come with them.</p></div>
+        <div class="use"><h3>Classes and meetings</h3><p>Online classes and recordings, with Calls mode for the lowest delay.</p></div>
+      </div>
+      <p class="note">Recitation and voices are kept: Vocalizer only takes out what isn't voice. It removes most music very well, but no tool is perfect. Heavy reverb, choirs and backing vocals can leave faint traces, and Best mode removes the most.</p>
+    </div>
+  </section>
+
+  <section id="private" class="alt">
+    <div class="wrap">
+      <div class="split private">
+        <div>
+          <h2>Private by design. Not by promise.</h2>
+          <p class="sub">An app that hears everything your Mac plays has to earn your trust. Vocalizer is built so it doesn't have to ask for it: you can check every part of this yourself.</p>
+        </div>
+        <ul class="checks">
+          <li><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></span><div><h3>Fully on your Mac</h3><p>The music is removed by your Mac's own Neural Engine and GPU. No servers, no cloud, works offline.</p></div></li>
+          <li><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.1A10 10 0 0 1 22 12a14.6 14.6 0 0 1-2.4 3.5M6.6 6.6A14.8 14.8 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/></svg></span><div><h3>Nothing recorded, nothing sent</h3><p>Sound is processed in memory and played straight back. It is never saved to disk and never uploaded.</p></div></li>
+          <li><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M3 3l18 18"/></svg></span><div><h3>No account, no tracking</h3><p>No sign-up, no ads, no analytics, no cookies. Vocalizer doesn't know who you are and doesn't want to.</p></div></li>
+          <li><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></span><div><h3>Open source</h3><p>All of the code is public, so anyone can check exactly what it does. Only the maintainer can publish releases.</p></div></li>
+          <li><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span><div><h3>Signed and checked by Apple</h3><p>Every release is signed with an Apple Developer ID and notarized by Apple, so macOS opens it without warnings.</p></div></li>
+          <li><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></span><div><h3>Updates ask first</h3><p>New versions only install when you say so, and only after their signature is verified. Its one connection is checking for updates.</p></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="haya">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <h2>Mute swear words, too.</h2>
+          <p class="sub">Turn on <b>Mute swear words</b> and Vocalizer silences them as they play, recognized by your Mac's own speech recognition, with no extra delay. Good for family viewing, and for keeping your ears clean.</p>
+          <p class="sub">Works best in Best and Clean modes, and needs macOS 26 or later. Like any speech recognition, it can occasionally miss a word.</p>
+        </div>
+        <div class="shot"><img src="/img/menu.png" alt="The Vocalizer menu with the Mute swear words switch" width="320" height="314" loading="lazy" decoding="async"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="setup" class="alt">
+    <div class="wrap">
+      <h2>Ready in a minute.</h2>
+      <p class="sub">Requires a Mac with Apple silicon (M1 or later) and macOS 14.2 or later.</p>
+      <ol class="steps">
+        <li class="step"><h3>Download</h3><p>Download Vocalizer and drag it to your Applications folder. It's free, with nothing to buy inside.</p></li>
+        <li class="step"><h3>Open it</h3><p>It lives in the menu bar. For video, click <b>Install</b> in its menu once, so lips stay in sync with the voice.</p></li>
+        <li class="step"><h3>Switch it on</h3><p>Flip the switch and click <b>Allow</b> when macOS asks about System Audio Recording. That's it.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="questions">
+    <div class="wrap">
+      <h2>Questions.</h2>
+      <div class="faq">
+        <details><summary>Is it really free?</summary><p>Yes. No price, no ads, no subscription and nothing to buy inside. It's open source under the MIT license.</p></details>
+        <details><summary>Does it change Qur'an recitation?</summary><p>No. Recitation is voice, and Vocalizer keeps voices. It only removes what isn't voice, so recitation and adhan come through as they are.</p></details>
+        <details><summary>Will it catch every bit of music?</summary><p>Most music is removed very well, especially in Clean and Best modes. Heavy reverb, choirs and backing vocals can leave faint traces. If something matters a lot to you, use Best mode.</p></details>
+        <details><summary>Does it work on YouTube, Instagram and TikTok?</summary><p>Yes, in any browser and in any Mac app, because it works on your Mac's sound itself rather than inside one app.</p></details>
+        <details><summary>Can anyone see what I watch or listen to?</summary><p>No. Vocalizer has no account and sends nothing anywhere. The sound is processed on your Mac and never saved. Its only connection is checking for updates. See the <a class="inline" href="/privacy">privacy policy</a>.</p></details>
+        <details><summary>Is there a delay?</summary><p>A short one (about 0.4 s in the default Fast mode). With video sync, video players wait for the voice, so in videos you won't notice it. Use Calls mode for calls and games.</p></details>
+        <details><summary>Does it work on iPhone or Windows?</summary><p>Not yet. Vocalizer is for Macs with Apple silicon.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <div class="final">
+    <div class="wrap">
+      <img class="logo-sm" src="/img/icon.png" alt="" width="76" height="76" loading="lazy">
+      <h2>Listen with a clear heart.</h2>
+      <p class="sub">Free for every Mac with Apple silicon. Share it with someone who'd benefit.</p>
+      <a class="btn" href="/download">Download Vocalizer</a>
+      <p class="meta"><span data-version>Version 0.3.9</span><span data-size>110 MB</span></p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Vocalizer. Open source under the MIT license.</span>
+    <nav aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="https://github.com/0xArx/vocalizer-mac">Source</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>
