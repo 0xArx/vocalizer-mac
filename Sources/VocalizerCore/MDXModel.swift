@@ -37,7 +37,18 @@ public final class MDXModel {
         // Check the backing is accepted; if Core ML rejects it, fall back to its own buffers.
         if (try? predict()) == nil { options.outputBackings = [:] }
         usesOutputBacking = !(options.outputBackings.isEmpty)
+        // How fast this Mac runs it (warm): the slowest of a few calls. Sizes the safety buffer per Mac.
+        var slowest = 0.0
+        for _ in 0..<3 {
+            let t = CFAbsoluteTimeGetCurrent()
+            _ = try? predict()
+            slowest = max(slowest, CFAbsoluteTimeGetCurrent() - t)
+        }
+        callTime = slowest
     }
+
+    /// Seconds per warm call on this Mac (measured when loaded).
+    public private(set) var callTime = 0.0
 
     /// One prediction; Objective-C exceptions from Core ML become Swift errors, and the model is reloaded.
     private func predict() throws -> MLFeatureProvider {

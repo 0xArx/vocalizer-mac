@@ -133,18 +133,86 @@ final class AppModel: ObservableObject {
             guard muteSwearWords != oldValue else { return }
             if !AppModel.testing { UserDefaults.standard.set(muteSwearWords, forKey: "muteSwearWords") }
             engine.setProfanityFilter(muteSwearWords)
+            let before = mode
             if muteSwearWords {
+                engine.preloadSwearModel(frames: SeparatorConfig.quality.frames)
                 if fastOnly { fastOnly = false }
                 if !mode.catchesSwearWords { modeBeforeFilter = mode; mode = .quality }
             } else {
                 if let m = modeBeforeFilter, mode == .quality { mode = m }
                 modeBeforeFilter = nil
             }
+            // Clean holds the sound longer (and moves off the Neural Engine) while the filter is on: restart it.
+            if mode == before, mode == .quality, enabled { apply() }
         }
     }
     private var modeBeforeFilter: Mode?
-    /// The modes the menu offers right now.
-    var modeChoices: [Mode] { muteSwearWords ? availableModes.filter(\.catchesSwearWords) : availableModes }
+    /// The modes the menu offers right now: not ones this Mac measured too slow, and with the swear-word
+    /// filter on, only the ones slow enough to catch words before they play.
+    var modeChoices: [Mode] {
+        let fit = availableModes.filter { !tooSlow.contains($0) }
+        return muteSwearWords ? fit.filter(\.catchesSwearWords) : fit
+    }
+
+    // MARK: this Mac's speed (measured, not assumed)
+
+    /// Modes whose model this Mac can't run in real time (measured when each model loads).
+    @Published private(set) var tooSlow: Set<Mode> = []
+    /// Measured seconds per model call, for Settings › details.
+    @Published private(set) var speeds: [Mode: Double] = [:]
+
+    /// A model keeps up if one call takes well under the audio it covers (one step).
+    private func checkSpeeds() {
+        var slow = Set<Mode>(), sp = [Mode: Double]()
+        for (m, config) in [(Mode.live, SeparatorConfig.live), (.quality, SeparatorConfig.quality)] {
+            guard let t = engine.callTime(frames: config.frames) else { continue }
+            sp[m] = t
+            if t > 0.7 * Double(config.step) / 44_100 { slow.insert(m) }
+        }
+        if let t = engine.roformerCallTime {
+            sp[.supreme] = t
+            if t > 0.8 * Double(RoformerConfig.supreme.step) / 44_100 { slow.insert(.supreme) }
+        }
+        if slow.count == 2, !slow.contains(.supreme) { slow.remove(.live) } // always leave something to use
+        speeds = sp
+        if slow != tooSlow {
+            tooSlow = slow
+            if !slow.isEmpty { NSLog("Vocalizer: too slow on this Mac for %@", slow.map(\.rawValue).joined(separator: ", ")) }
+        }
+        if tooSlow.contains(mode), let next = modeChoices.first { mode = next }
+    }
+
+    // MARK: how long Clean holds the sound for the swear-word filter (learned on this Mac)
+
+    /// The filter mutes a word only once its exact time arrives, 1.4-3 s after the word on an M-series Mac
+    /// (slower Macs take longer). Clean holds the sound long enough for that: the slowest arrivals seen here
+    /// (90th percentile) plus a long word, starting from 3 s before anything has been measured.
+    private var swearHoldMs: Double {
+        let seen = (UserDefaults.standard.array(forKey: "swearArrivals") as? [Double]) ?? []
+        let p90 = seen.count >= 5 ? seen.sorted()[Int(Double(seen.count - 1) * 0.9)] : 3.0
+        let total = min(8.0, max(3.0, p90) + 0.9)
+        return max(300, total * 1000 - Mode.quality.latencyMs - 35)
+    }
+
+    /// Remembers how late exact word times arrived in this session (the newest 60).
+    private func learnSwearTiming() {
+        let new = engine.swearArrivals
+        guard !new.isEmpty, !AppModel.testing else { return }
+        let seen = (UserDefaults.standard.array(forKey: "swearArrivals") as? [Double]) ?? []
+        UserDefaults.standard.set(Array((seen + new).suffix(60)), forKey: "swearArrivals")
+    }
+
+    /// Extra buffering for `mode` right now (nil: the engine's own default for the mode).
+    private func jitterMs(sync: Bool) -> Double? {
+        if muteSwearWords && mode == .quality { return swearHoldMs }
+        return sync ? mode.syncJitterMs : nil
+    }
+
+    /// Expected capture-to-speaker delay in seconds, as the menu shows it.
+    var expectedDelaySeconds: Double {
+        if muteSwearWords && mode == .quality { return (Mode.quality.latencyMs + swearHoldMs + 35) / 1000 }
+        return mode.expectedDelayMs(sync: syncActive) / 1000
+    }
     let swearFilterSupported = VocalizerEngine.profanityFilterSupported
     @Published private(set) var reportedLatencyMs = 0.0
     // MARK: Supreme model download
@@ -166,7 +234,10 @@ final class AppModel: ObservableObject {
             if let files = SupremeModel.files() {
                 Task.detached { [engine] in
                     try? engine.preloadRoformer(model: files.model, info: files.info)
-                    await MainActor.run { if self.enabled && self.mode == .supreme { self.apply() } }
+                    await MainActor.run {
+                        self.checkSpeeds()
+                        if self.enabled && self.mode == .supreme { self.apply() }
+                    }
                 }
             }
         }
@@ -216,6 +287,8 @@ final class AppModel: ObservableObject {
                 await MainActor.run {
                     self.ready = true
                     self.status = "Ready"
+                    self.checkSpeeds()
+                    if self.muteSwearWords { self.engine.preloadSwearModel(frames: SeparatorConfig.quality.frames) }
                     // Resume where the user left off (not in the test modes, which drive `enabled` themselves).
                     if !AppModel.testing && UserDefaults.standard.bool(forKey: "wasOn") {
                         self.restoring = true
@@ -296,6 +369,7 @@ final class AppModel: ObservableObject {
             }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.learnSwearTiming() }
             MainActor.assumeIsolated {
                 self?.engine.stop()
                 self?.restoreRealOutput()
@@ -540,6 +614,7 @@ final class AppModel: ObservableObject {
     }
 
     private func apply() {
+        learnSwearTiming()
         driverInstalled = AudioProcesses.vocalizerDevice() != nil
         defer { refreshOutputs() }
         // Best's model takes a few seconds to load and warm up on the GPU: do it off the main thread and keep
@@ -554,6 +629,8 @@ final class AppModel: ObservableObject {
                     await MainActor.run {
                         self.preparing = nil
                         if let failure { self.error = L("Best mode: %@", "\(failure)"); return }
+                        self.checkSpeeds()
+                        if self.tooSlow.contains(.supreme) { self.error = L("This Mac is too slow for Best. Clean is the closest."); return }
                         if self.enabled && self.mode == .supreme { self.apply() }
                     }
                 }
@@ -607,12 +684,12 @@ final class AppModel: ObservableObject {
                 let wasRouted = (try? AudioProcesses.defaultOutputDevice()) == AudioProcesses.vocalizerDevice()
                 guard let separation = mode.separation else { throw CAError(-1, "Download the Supreme model first") }
                 try engine.start(source: .virtualDevice, separation: separation,
-                                 jitterMs: mode.syncJitterMs, outputDevice: real, fixedDelay: true)
+                                 jitterMs: jitterMs(sync: true), outputDevice: real, fixedDelay: true)
                 reportLatency(bounce: wasRouted)
             } else {
                 restoreRealOutput()
                 guard let separation = mode.separation else { throw CAError(-1, "Download the Supreme model first") }
-                try engine.start(source: source, separation: separation)
+                try engine.start(source: source, separation: separation, jitterMs: jitterMs(sync: false))
             }
             lastHeard = Date()
             starts += 1

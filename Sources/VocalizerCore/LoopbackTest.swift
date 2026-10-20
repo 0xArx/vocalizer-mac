@@ -118,7 +118,7 @@ public enum LoopbackTest {
         guard err == noErr else { log("recorder ioproc failed \(err)"); throw LoopbackError(message: "failed") }
 
         if sync {
-            try engine.start(source: .virtualDevice, separation: separation, jitterMs: base == "supreme" ? 700 : base == "quality" ? 300 : base == "ultra" ? 80 : 200, outputDevice: realOutput)
+            try engine.start(source: .virtualDevice, separation: separation, jitterMs: Double(ProcessInfo.processInfo.environment["VOCALIZER_TEST_JITTER"] ?? "") ?? (base == "supreme" ? 700 : base == "quality" ? 300 : base == "ultra" ? 80 : 200), outputDevice: realOutput)
             let ms = engine.stats.totalLatencyMs
             try AudioProcesses.setVocalizerLatency(frames: Int(ms / 1000 * 48_000))
             if let v = AudioProcesses.vocalizerDevice() {

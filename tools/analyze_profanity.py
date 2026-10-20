@@ -46,3 +46,28 @@ for k in range(n):
     if not muted and cur is not None: spans.append((cur * 0.02, k * 0.02)); cur = None
 print("  muted spans (source time):", ", ".join(f"{a:.2f}-{b:.2f}" for a, b in spans if b - a >= 0.04))
 print("  swear words (source time): ", ", ".join(f"{w['word']} {w['start']:.2f}-{w['end']:.2f}" for w in words))
+# Precision (needs exact word times, e.g. tools/make_swear_fixture.py): per 10 ms, is the output muted?
+fr = 480
+n = min(len(out_off) - s_off, len(out_on) - s_on, len(src)) // fr
+mutedf = np.zeros(n, bool)
+for k in range(n):
+    a = out_off[s_off + k * fr:s_off + (k + 1) * fr]; b = out_on[s_on + k * fr:s_on + (k + 1) * fr]
+    mutedf[k] = rms(a) > 0.002 and 20 * np.log10(rms(a) / max(rms(b), 1e-9)) > 20
+inword = np.zeros(n, bool); near = np.zeros(n, bool)
+for w in words:
+    inword[int(w["start"] * 100):int(w["end"] * 100) + 1] = True
+    near[max(0, int((w["start"] - 0.03) * 100)):int((w["end"] + 0.03) * 100) + 1] = True  # 30 ms tolerance
+print("  precision per word (share of the word muted | extra muted before / after it):")
+for w in words:
+    a, b = int(w["start"] * 100), int(w["end"] * 100) + 1
+    cov = mutedf[a:b].mean() if b > a else 0
+    k = a
+    while k > 0 and mutedf[k - 1] and not inword[k - 1]: k -= 1
+    before = (a - k) / 100
+    k = b
+    while k < n and mutedf[k] and not inword[k]: k += 1
+    after = (k - b) / 100
+    print(f"    {w['word']:9s} {cov * 100:5.0f}% muted | +{before:.2f} s before, +{after:.2f} s after")
+skip = int(max(0, words[0]["start"] - 1.0) * 100)  # before the speech: start-up differences between runs
+cut = (mutedf[skip:] & ~near[skip:]).sum() / 100
+print(f"  OTHER SPEECH CUT: {cut:.2f} s in total (outside the swear words, beyond 30 ms)")

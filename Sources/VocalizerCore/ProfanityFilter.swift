@@ -1,15 +1,14 @@
-// Optional swear-word filter. Adds no delay: it listens to the audio the moment it is captured and mutes
-// words inside the delay Vocalizer already has (Live ~0.4 s, Quality ~1.9 s, Supreme ~7 s).
+// Optional swear-word filter. Adds no delay of its own: it listens to the audio the moment it is captured and
+// mutes words inside the delay the mode already has (Clean holds the sound longer while it's on; Best ~7 s).
 //
 // Apple's on-device SpeechTranscriber (macOS 26+) transcribes the captured mix (accurate even with music
 // behind the voice). With etiquette replacements on, it masks profanity as "****"; a short list adds milder
-// words it leaves alone. Measured on speech over music:
-//   - volatile (fast) results arrive 0.05-0.7 s after a word, but only with a coarse time window,
-//   - final results arrive 1.3-2 s after a word, with exact per-word times.
-// So: a provisional mute is placed from the volatile result (a window covering where the word can be), then
-// replaced by the exact range if the final result arrives before the word plays. Measured on a speech-over-music
-// clip with 7 swear words (tools/analyze_profanity.py): Supreme 6/7 muted precisely, Quality 5/7 (wider mutes),
-// Live 0/7 (the words play before they are recognized). Misses were words the recognizer misheard.
+// words it leaves alone. Only FINAL results are used: they carry each word's own time (measured within about
+// 0.1-0.3 s of the true word, usually a little early) and arrive 1.4-3 s after the word on an M-series Mac.
+// Quick (volatile) results have no word times; mutes placed from them had to cover ~1.5 s and cut the words
+// around the swear word, so they are no longer used. A word whose exact time arrives after it has played is
+// missed (counted as late); `arrivals` records how late results come so the app can hold the sound long enough.
+// Measure with tools/make_swear_fixture.py (exact word times) + tools/analyze_profanity.py.
 
 import AVFoundation
 import CRing
@@ -41,7 +40,19 @@ public final class ProfanityFilter: @unchecked Sendable {
     public private(set) var buffersFed = 0, buffersDropped = 0, resultsSeen = 0
     public private(set) var lastText = ""
     private var firstBuffer = true
-    /// Diagnostics: every mute placed (kind 0 exact, 1 estimated), in capture seconds, with the word.
+    /// Audio waiting to fill the next 100 ms block. The recognizer only keeps its clock exact for whole blocks:
+    /// fed odd-sized small buffers (Clean hands over ~12 ms at a time) it lost a little time on each one, and
+    /// after 25 s it placed words up to 1 s too early, so every mute missed or cut the words before.
+    private var block: AVAudioPCMBuffer?
+    /// Capture index of the very first frame handed to the recognizer (its clock's zero).
+    private var firstFrame: Int64 = -1
+    /// Diagnostics: buffers the recognizer's input queue threw away because it fell behind.
+    public private(set) var queueDrops = 0
+    /// The newest captured frame handed to the recognizer (to measure how late results arrive).
+    private var latestFrame: Int64 = 0
+    /// How many seconds after each swear word its exact time arrived (newest last, up to 50).
+    public private(set) var arrivals: [Double] = [] { didSet { if arrivals.count > 50 { arrivals.removeFirst(arrivals.count - 50) } } }
+    /// Diagnostics: every mute placed, in capture seconds, with the word.
     public private(set) var eventLog: [String] = [] { didSet { if eventLog.count > 50 { eventLog.removeFirst(eventLog.count - 50) } } }
     public private(set) var anchorFrame: Int64 = -1
     private let inputRate: Double
@@ -52,12 +63,6 @@ public final class ProfanityFilter: @unchecked Sendable {
     private var converter: AVAudioConverter?
     private var analyzerFormat: AVAudioFormat?
     private var inFormat: AVAudioFormat
-    private var nextID: Int32 = 1
-    /// Provisional mutes not yet replaced: id -> input-frame range.
-    private var provisional: [Int32: (Int64, Int64)] = [:]
-    /// Tracks the volatile text of the current utterance, to find what is new in each update.
-    private var volatileStart = CMTime.invalid
-    private var placedInUtterance = 0
 
     /// `queue` is the engine's CMuteQueue; events are in input-frame units at `inputRate`.
     public init(inputRate: Double, queue: OpaquePointer) {
@@ -119,17 +124,35 @@ public final class ProfanityFilter: @unchecked Sendable {
             if fed { st.pointee = .noDataNow; return nil }
             fed = true; st.pointee = .haveData; return input
         }
+        latestFrame = startFrame + Int64(count)
+        if firstFrame < 0 { firstFrame = startFrame }
         guard out.frameLength > 0 else { buffersDropped += 1; return }
-        buffersFed += 1
-        // Only the first buffer carries a time: it anchors the recognizer's clock to the capture counter, and
-        // the rest follow contiguously. (Stamping every buffer made rounded, overlapping times, and the
-        // recognizer returned nothing at all.)
-        if firstBuffer {
-            firstBuffer = false
-            anchorFrame = startFrame
-            cont.yield(AnalyzerInput(buffer: out, bufferStartTime: CMTime(value: startFrame, timescale: CMTimeScale(inputRate))))
-        } else {
-            cont.yield(AnalyzerInput(buffer: out))
+        // Copy into 100 ms blocks and hand on only full ones.
+        let blockFrames = AVAudioFrameCount(analyzerFormat.sampleRate / 10)
+        var done: AVAudioFrameCount = 0
+        while done < out.frameLength {
+            if block == nil { block = AVAudioPCMBuffer(pcmFormat: analyzerFormat, frameCapacity: blockFrames) }
+            guard let b = block else { return }
+            let n = min(blockFrames - b.frameLength, out.frameLength - done)
+            // Byte copy: the recognizer's format may be integer or float, interleaved or not.
+            let bpf = Int(analyzerFormat.streamDescription.pointee.mBytesPerFrame)
+            let from = UnsafeMutableAudioBufferListPointer(out.mutableAudioBufferList)
+            let to = UnsafeMutableAudioBufferListPointer(b.mutableAudioBufferList)
+            for i in 0..<min(from.count, to.count) {
+                guard let s = from[i].mData, let d = to[i].mData else { return }
+                (d + Int(b.frameLength) * bpf).copyMemory(from: s + Int(done) * bpf, byteCount: Int(n) * bpf)
+            }
+            b.frameLength += n
+            done += n
+            guard b.frameLength == blockFrames else { break }
+            block = nil
+            // Every block carries its exact capture time (whole 100 ms steps, so times never overlap or round).
+            // Under load (Clean shares the Neural Engine with the recognizer) the recognizer's own running clock
+            // slipped by up to 1 s in 25 s; with a time on every block it can't lose its place.
+            if firstBuffer { firstBuffer = false; anchorFrame = firstFrame }
+            let at = firstFrame + Int64(buffersFed) * Int64(inputRate / 10)
+            buffersFed += 1
+            if case .dropped = cont.yield(AnalyzerInput(buffer: b, bufferStartTime: CMTime(value: at, timescale: CMTimeScale(inputRate)))) { queueDrops += 1 }
         }
     }
 
@@ -141,63 +164,32 @@ public final class ProfanityFilter: @unchecked Sendable {
         _ = cmute_push(queue, CMuteEvent(start: frames(start), end: frames(end), id: id, kind: kind))
     }
 
+    /// Padding around the recognizer's word time, in seconds: before, after, and the shortest mute.
+    /// Measured against exact word times: the recognizer places a word's start ~0.12 s early (up to 0.38 s) and its
+    /// end ~0.1 s early (-0.29..+0.13 s), so the mute starts a little after the reported start and runs past the end. Tunable for tests with VOCALIZER_SWEAR_PAD="before,after,min".
+    private static let pad: (before: Double, after: Double, min: Double) = {
+        let v = (ProcessInfo.processInfo.environment["VOCALIZER_SWEAR_PAD"] ?? "").split(separator: ",").compactMap { Double($0) }
+        return v.count == 3 ? (v[0], v[1], v[2]) : (-0.03, 0.06, 0.3)
+    }()
+
     private func handle(_ result: SpeechTranscriber.Result) {
         resultsSeen += 1
         lastText = String(result.text.characters.suffix(60))
-        let isFinal = result.resultsFinalizationTime >= result.range.end
+        guard result.resultsFinalizationTime >= result.range.end else { return } // only final results have word times
         let text = result.text
-        if isFinal {
-            // Exact words: replace any provisional mutes in this stretch, then mute each word precisely.
-            let rs = result.range.start.seconds, re = result.range.end.seconds
-            var alreadyCounted = 0
-            for (id, r) in provisional where Double(r.1) / inputRate > rs - 0.5 && Double(r.0) / inputRate < re + 0.5 {
-                push(0, 0, id: id, kind: 2)
-                provisional[id] = nil
-                alreadyCounted += 1
-            }
-            for run in text.runs {
-                guard let tr = run.audioTimeRange else { continue }
-                let word = String(text[run.range].characters)
-                guard ProfanityWords.isProfane(word) else { continue }
-                // Count each swear word once: those already caught by an estimate are not counted again.
-                if alreadyCounted > 0 { alreadyCounted -= 1 } else { wordsFound += 1 }
-                eventLog.append(String(format: "exact %@ %.2f-%.2f (result %.2f-%.2f)", word, tr.start.seconds, tr.end.seconds, rs, re))
-                // Recognizer word ranges can be short (masked words especially): pad, and never under 0.35 s.
-                // (A word that opens an utterance is often placed slightly late: give the start more room.)
-                var a = tr.start.seconds - 0.2, b = tr.end.seconds + 0.12
-                if b - a < 0.45 { let mid = (a + b) / 2; a = mid - 0.25; b = mid + 0.2 }
-                push(a, b, id: 0, kind: 0)
-            }
-            volatileStart = .invalid
-            placedInUtterance = 0
-            return
-        }
-        // Volatile (quick) results carry no per-word times. Measured on speech over music, a swear word first
-        // shows up 0.3-1.0 s (typically ~0.6 s) after it ends, and each word after it in the same text is ~0.3 s
-        // later. So: word end ~= range end - 0.6 s - 0.3 s per following word; mute a tight window around that.
-        // Each swear word in an utterance is placed once (revised text used to stack repeated mutes).
-        if result.range.start != volatileStart {
-            volatileStart = result.range.start
-            placedInUtterance = 0
-        }
-        let words = String(text.characters).split(whereSeparator: { $0 == " " || $0 == "\n" }).map(String.init)
-        let swearIndices = words.indices.filter { ProfanityWords.isProfane(words[$0]) }
-        guard swearIndices.count > placedInUtterance else { return }
-        let rangeEnd = result.range.end.seconds
-        for idx in swearIndices.dropFirst(placedInUtterance) {
-            let following = words.count - 1 - idx
-            // Measured: the word ends 0.1-1.1 s before the range end; cover that whole spread.
-            let lastEnd = rangeEnd - 0.1 - 0.3 * Double(following)
-            let duration = min(0.7, max(0.3, 0.07 * Double(words[idx].count) + 0.1))
-            // Not clamped to the utterance start: the recognizer often opens an utterance after its first word began.
-            let a = lastEnd - 1.0 - duration, b = lastEnd + 0.05
-            let id = nextID
-            nextID += 1
-            provisional[id] = (frames(a), frames(b))
+        let now = Double(latestFrame) / inputRate
+        for run in text.runs {
+            let word = String(text[run.range].characters)
+            guard ProfanityWords.isProfane(word) else { continue }
+            guard let tr = run.audioTimeRange else { eventLog.append("untimed \(word)"); continue }
             wordsFound += 1
-            eventLog.append(String(format: "estimate %@ %.2f-%.2f (range end %.2f, %d words after)", words[idx], a, b, rangeEnd, following))
-            push(a, b, id: id, kind: 1)
+            arrivals.append(now - tr.end.seconds)
+            eventLog.append(String(format: "exact %@ %.2f-%.2f (arrived %.2f s after the word)", word,
+                                   tr.start.seconds, tr.end.seconds, now - tr.end.seconds))
+            // Masked words can come back very short: never mute less than `min`, growing toward the end.
+            let a = tr.start.seconds - Self.pad.before
+            let b = max(tr.end.seconds + Self.pad.after, a + Self.pad.min)
+            push(a, b, id: 0, kind: 0)
         }
-        placedInUtterance = swearIndices.count
     }
 }

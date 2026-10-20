@@ -173,7 +173,7 @@ struct MenuView: View {
                     .buttonStyle(.plain)
                 }
             }
-            Text(model.mode.hint(delaySeconds: model.mode.expectedDelayMs(sync: model.syncActive) / 1000))
+            Text(model.mode.hint(delaySeconds: model.expectedDelaySeconds))
                 .font(.system(size: 11.5)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -305,6 +305,13 @@ struct MenuView: View {
 struct StatusView: View {
     @EnvironmentObject var model: AppModel
 
+    /// Measured model speed per mode on this Mac (the buffers are sized from it).
+    private var speedLine: String {
+        [Mode.live, .quality, .supreme].compactMap { m in
+            model.speeds[m].map { "\(m.title) \(Int(($0 * 1000).rounded())) ms" + (model.tooSlow.contains(m) ? " (" + L("too slow") + ")" : "") }
+        }.joined(separator: " · ")
+    }
+
     var body: some View {
         let s = model.stats
         if s.running {
@@ -314,6 +321,9 @@ struct StatusView: View {
                             s.realTimeFactor > 0 ? L("%@× faster than real time", String(format: "%.0f", 1 / s.realTimeFactor)) : L("starting"),
                             s.underruns == 0 ? L("no glitches") : L("%@ glitches", "\(s.underruns)")))
                     .font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                if !speedLine.isEmpty {
+                    Text(L("This Mac: %@", speedLine)).font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                }
                 Text(L("Version %@", model.updater.current)).font(.system(size: 11)).foregroundStyle(.tertiary)
             }
         } else {

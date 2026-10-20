@@ -111,7 +111,7 @@ Layout:
 | `Sources/VocalizerCore/StreamingSeparator.swift` | sliding-window MDX separation, presets (live / balanced / quality) |
 | `Sources/VocalizerCore/MDXSpectrogram.swift`, `MDXModel.swift` | STFT/iSTFT matching UVR, Core ML wrapper |
 | `Sources/VocalizerCore/DeepFilterSeparator.swift` | Calls mode (DeepFilterNet3 via `libdf.dylib`, loaded at runtime) |
-| `Sources/VocalizerCore/ProfanityFilter.swift`, `Sources/CRing/cmute.c` | swear-word filter: SpeechAnalyzer on the captured audio, mute events applied on the IO thread (no added delay); test with `tools/analyze_profanity.py` |
+| `Sources/VocalizerCore/ProfanityFilter.swift`, `Sources/CRing/cmute.c` | swear-word filter: SpeechAnalyzer on the captured audio, mutes from FINAL results only (exact word times), applied on the IO thread. Only Clean/Best are offered while it's on; Clean then runs its model on the GPU (sharing the Neural Engine made the recognizer's times slip) and holds the sound longer, learned per Mac from how late results arrive (`swearArrivals`). Test: `tools/make_swear_fixture.py` (clip with exact word times) + `tools/analyze_profanity.py` (share of each word muted, other speech cut) |
 | `Sources/VocalizerCore/RoformerSeparator.swift`, `SupremeModel.swift` | Supreme mode (MelBand RoFormer on the GPU) and its on-demand download (`models-v1` release) |
 | `Sources/VocalizerMac/Updater.swift`, `SelfInstaller.swift` | Sparkle finds updates; SelfInstaller installs them by swapping the whole bundle after checking the EdDSA signature (SUPublicEDKey) and the Developer ID team, because macOS App Management blocks writes inside a notarized app and Sparkle would ask for an admin password. Test hooks: `VOCALIZER_FEED_URL`, `VOCALIZER_UPDATE_NOW`, `VOCALIZER_TEST_CLICK_UPDATE` |
 | `Sources/VocalizerCore/AudioProcesses.swift` | process list, devices, volume, the Vocalizer device's `'vlat'` latency property |
@@ -122,6 +122,8 @@ Layout:
 | `website/` | the static site at getvocalizer.com (Vercel project `vocalizer`; the old vocalizer-mac.vercel.app still serves it, including the appcast that 0.3.5–0.3.7 read); deploy with `npx vercel deploy --prod` from that folder. `website/ar/` is generated: edit the English pages, then `python3 tools/ar_site.py` |
 
 Rules that matter:
+
+- **Measure, don't assume, speed.** Each model times a few calls when it loads on this Mac (`MDXModel.callTime`, `RoformerSeparator.modelCallTime`); buffers are sized from that, and a mode whose call takes too long for its step is hidden (`AppModel.checkSpeeds`). Settings › details shows the numbers.
 
 - **Never block the IO thread** (`VocalizerEngine.io`): no locks, allocation, logging or Swift arrays that grow.
 - **In sync mode the delay is fixed** for the whole run (`fixedDelay: true`) and reported once. Changing it while a

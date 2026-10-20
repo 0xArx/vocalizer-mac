@@ -39,7 +39,7 @@ public struct EngineStats {
 
 public final class VocalizerEngine {
     private let modelURLs: [Int: URL]
-    private var models: [Int: MDXModel] = [:]
+    private var models: [String: MDXModel] = [:]
     private let modelLock = NSLock()
 
     private var tapID = AudioObjectID(kAudioObjectUnknown)
@@ -110,6 +110,9 @@ public final class VocalizerEngine {
     private var roformer: (url: URL, sep: RoformerSeparator)?
 
     /// True when the Supreme model at `model` is loaded and warmed up (starting it is then instant).
+    /// Seconds per Best model call on this Mac (measured when it loaded), nil before.
+    public var roformerCallTime: Double? { roformer.map { $0.sep.modelCallTime } }
+
     public func isRoformerLoaded(_ model: URL) -> Bool {
         modelLock.lock(); defer { modelLock.unlock() }
         return roformer?.url == model
@@ -143,13 +146,32 @@ public final class VocalizerEngine {
     /// Loads (and compiles for the Neural Engine) every model up front; takes a few seconds.
     public func preload() throws { for f in modelURLs.keys.sorted() { _ = try model(f) } }
 
-    private func model(_ frames: Int) throws -> MDXModel {
+    /// The Neural Engine is fastest for these models, but Apple's speech recognizer runs there too: sharing it,
+    /// the recognizer's word times slipped (up to 1 s early after 25 s), so swear-word mutes missed. With the
+    /// filter on, Clean's model runs on the GPU instead (slower, so it gets a bigger buffer; measured per Mac).
+    private func model(_ frames: Int, gpu: Bool = false) throws -> MDXModel {
         modelLock.lock(); defer { modelLock.unlock() }
-        if let m = models[frames] { return m }
+        let key = "\(frames)\(gpu ? "-gpu" : "")"
+        if let m = models[key] { return m }
         guard let url = modelURLs[frames] else { throw NSError(domain: "Vocalizer", code: 2, userInfo: [NSLocalizedDescriptionKey: "no \(frames)-frame model"]) }
-        let m = try MDXModel(url: url, frames: frames)
-        models[frames] = m
+        let m = try MDXModel(url: url, frames: frames, computeUnits: gpu ? .cpuAndGPU : .all)
+        models[key] = m
+        NSLog("Vocalizer: %@ model on this Mac: %.0f ms per call", key, m.callTime * 1000)
         return m
+    }
+
+    /// Whether Clean (and the other MDX modes) should avoid the Neural Engine right now.
+    private func mdxOnGPU(_ config: SeparatorConfig) -> Bool { filterWanted && config.frames >= 256 }
+
+    /// Measured seconds per model call on this Mac, per mode's model (after it has loaded).
+    public func callTime(frames: Int, gpu: Bool = false) -> Double? {
+        modelLock.lock(); defer { modelLock.unlock() }
+        return models["\(frames)\(gpu ? "-gpu" : "")"]?.callTime
+    }
+
+    /// Loads (and times) the model Clean uses with the swear filter on, ahead of time.
+    public func preloadSwearModel(frames: Int) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in _ = try? self?.model(frames, gpu: true) }
     }
 
     public var stem: OutputStem = .vocals { didSet { separator?.stem = stem } }
@@ -173,8 +195,15 @@ public final class VocalizerEngine {
         let defaultJitter: Double
         switch separation {
         case .mdx(let config):
-            sep = StreamingSeparator(config: config, model: try model(config.frames))
-            defaultJitter = config.frames >= 256 ? 250 : 100
+            var m = try model(config.frames, gpu: mdxOnGPU(config))
+            // A GPU too slow to keep up right now (an older Mac, or one saving battery): back to the Neural Engine.
+            if mdxOnGPU(config), m.callTime > 0.7 * Double(config.step) / MDX.sampleRate {
+                NSLog("Vocalizer: GPU too slow for this mode right now (%.0f ms per call); using the Neural Engine", m.callTime * 1000)
+                m = try model(config.frames)
+            }
+            sep = StreamingSeparator(config: config, model: m)
+            // The buffer must cover one model call on this Mac (measured when it loaded), with margin.
+            defaultJitter = max(config.frames >= 256 ? 250 : 100, m.callTime * 1500 + 50)
         case .deepFilter:
             guard let df = deepFilterFiles else { throw CAError(-1, "DeepFilterNet library not bundled") }
             sep = try DeepFilterSeparator(library: df.library, model: df.model)
@@ -271,7 +300,8 @@ public final class VocalizerEngine {
         }
 
         // 3. Rings and priming: playback starts `step + jitter` behind the separated stream.
-        let jitter = max(jitterMs ?? defaultJitter, defaultJitter > 1000 ? defaultJitter : 0)
+        // Never less than this Mac needs (measured), even if the caller asked for less.
+        let jitter = max(jitterMs ?? defaultJitter, defaultJitter)
         let stepDev = Double(sep.step) * rate / sep.sampleRate
         let prime = Int(stepDev + jitter / 1000 * rate + Double(bufferFrames))
         primeFrames = prime
@@ -485,6 +515,13 @@ public final class VocalizerEngine {
         }
     }
 
+    /// How many seconds after each swear word its exact time arrived on this Mac (newest last).
+    public var swearArrivals: [Double] {
+        filterLock.lock(); let f = filterObject; filterLock.unlock()
+        if #available(macOS 26.0, iOS 26.0, *), let pf = f as? ProfanityFilter { return pf.arrivals }
+        return []
+    }
+
     /// Diagnostics: the filter's mute log and the capture frame its clock is anchored to.
     public var profanityEvents: (anchor: Int64, events: [String]) {
         filterLock.lock(); let f = filterObject; filterLock.unlock()
@@ -496,7 +533,7 @@ public final class VocalizerEngine {
     public var profanityDebug: String {
         filterLock.lock(); let f = filterObject; filterLock.unlock()
         if #available(macOS 26.0, iOS 26.0, *), let pf = f as? ProfanityFilter {
-            return "fed \(pf.buffersFed) dropped \(pf.buffersDropped) results \(pf.resultsSeen) found \(pf.wordsFound) last \"\(pf.lastText)\""
+            return "fed \(pf.buffersFed) dropped \(pf.buffersDropped) queue drops \(pf.queueDrops), results \(pf.resultsSeen) found \(pf.wordsFound) last \"\(pf.lastText)\""
         }
         return "-"
     }
