@@ -151,7 +151,22 @@ final class AppModel: ObservableObject {
     /// filter on, only the ones slow enough to catch words before they play.
     var modeChoices: [Mode] {
         let fit = availableModes.filter { !tooSlow.contains($0) }
-        return muteSwearWords ? fit.filter(\.catchesSwearWords) : fit
+        let choices = muteSwearWords ? fit.filter(\.catchesSwearWords) : fit
+        // Never an empty menu: if this Mac is too slow for everything allowed, offer the lightest of them.
+        return choices.isEmpty ? [muteSwearWords ? .quality : (availableModes.contains(.ultra) ? .ultra : .live)] : choices
+    }
+
+    /// Where to go when `m` is too slow here: the closest-sounding mode that is lighter per second of audio.
+    /// (Clean's 1 s steps cost less per second than Fast's, so a too-slow Fast goes to Clean first.)
+    private func fallback(from m: Mode) -> Mode? {
+        let order: [Mode] = switch m {
+        case .supreme: [.quality, .live, .ultra]
+        case .quality: [.live, .ultra]
+        case .live, .balanced: [.quality, .ultra]
+        case .ultra: [.live, .quality]
+        }
+        let ok = modeChoices.filter { $0 != m }
+        return order.first { ok.contains($0) } ?? ok.first
     }
 
     // MARK: this Mac's speed (measured, not assumed)
@@ -161,25 +176,25 @@ final class AppModel: ObservableObject {
     /// Measured seconds per model call, for Settings › details.
     @Published private(set) var speeds: [Mode: Double] = [:]
 
-    /// A model keeps up if one call takes well under the audio it covers (one step).
+    /// A model keeps up if a typical call takes under 80% of the audio it covers (one step). Measured with
+    /// simulated slower Macs (VOCALIZER_TEST_SPEED): closer than that, dropouts begin.
     private func checkSpeeds() {
         var slow = Set<Mode>(), sp = [Mode: Double]()
         for (m, config) in [(Mode.live, SeparatorConfig.live), (.quality, SeparatorConfig.quality)] {
             guard let t = engine.callTime(frames: config.frames) else { continue }
             sp[m] = t
-            if t > 0.7 * Double(config.step) / 44_100 { slow.insert(m) }
+            if t > 0.8 * Double(config.step) / 44_100 { slow.insert(m) }
         }
         if let t = engine.roformerCallTime {
             sp[.supreme] = t
             if t > 0.8 * Double(RoformerConfig.supreme.step) / 44_100 { slow.insert(.supreme) }
         }
-        if slow.count == 2, !slow.contains(.supreme) { slow.remove(.live) } // always leave something to use
         speeds = sp
         if slow != tooSlow {
             tooSlow = slow
             if !slow.isEmpty { NSLog("Vocalizer: too slow on this Mac for %@", slow.map(\.rawValue).joined(separator: ", ")) }
         }
-        if tooSlow.contains(mode), let next = modeChoices.first { mode = next }
+        if tooSlow.contains(mode), let next = fallback(from: mode) { mode = next }
     }
 
     // MARK: how long Clean holds the sound for the swear-word filter (learned on this Mac)
@@ -192,8 +207,12 @@ final class AppModel: ObservableObject {
         let floor = Double(ProcessInfo.processInfo.environment["VOCALIZER_TEST_SWEAR_FLOOR"] ?? "") ?? 2.5
         let p90 = swearSeen.count >= 5 ? swearSeen.sorted()[Int(Double(swearSeen.count - 1) * 0.9)] : 3.0
         // ...and always the slowest of the last 10, so a Mac that got slower (battery saving, busy) is covered at once.
-        let recent = swearSeen.suffix(10).max() ?? 0
-        let total = min(8.0, max(floor, p90, recent) + 0.9)
+        // (the second slowest when there are a few, so one freak result doesn't hold every word for 6 s)
+        let last = swearSeen.suffix(10).sorted()
+        let recent = last.count >= 4 ? last[last.count - 2] : (last.last ?? 0)
+        // + 1.3 s: the word itself (up to ~0.7 s) and room for a result a little slower than any seen yet
+        // (with +0.9 s about 1 word in 10 still came late on slower runs).
+        let total = min(8.0, max(floor, p90, recent) + 1.3)
         return max(300, total * 1000 - Mode.quality.latencyMs - 35)
     }
 
@@ -224,17 +243,26 @@ final class AppModel: ObservableObject {
     /// When each kind of recalibration last happened, per mode ("buffer", "hold", "gpu", "speed").
     private var lastRecalibration: [String: Date] = [:]
     private var slowSince: Date?
-    private var lateAtStart = 0
+    private var lateAfterWarmUp: Int?
     private var runStarted = Date.distantPast
     /// Dropouts already counted when the run's warm-up ended (only later ones mean the buffer is too small).
     private var underrunsAfterWarmUp: Int?
 
-    private func mayRecalibrate(_ kind: String, _ now: Date) -> Bool {
+    private func mayRecalibrate(_ kind: String, _ now: Date, mark: Bool = true) -> Bool {
         let key = "\(kind)-\(mode.rawValue)"
         // Every late swear word is heard, so that one may act sooner.
         guard now.timeIntervalSince(lastRecalibration[key] ?? .distantPast) > (kind == "hold" ? 20 : 60) else { return false }
-        lastRecalibration[key] = now
+        if mark { lastRecalibration[key] = now }
         return true
+    }
+
+    /// The mode can't keep up here right now: hide it until the next launch and go to the closest lighter one.
+    private func giveUp(on slow: Mode, _ why: String) {
+        tooSlow.insert(slow)
+        guard let next = fallback(from: slow) else { return }
+        NSLog("Vocalizer: recalibrate: %@ can't keep up on this Mac right now (%@); switching to %@", slow.rawValue, why, next.rawValue)
+        mode = next // restarts (and clears any notice), so say why afterwards
+        error = L("This Mac can't run %@ right now, so Vocalizer switched to %@.", slow.title, next.title)
     }
 
     /// Checks that what was calibrated still holds while playing, and recalibrates when it doesn't:
@@ -249,7 +277,9 @@ final class AppModel: ObservableObject {
         let now = Date()
         // Not in the first 10 s of a run: the first model calls (GPU warm-up) are slow and would look like a slow Mac.
         guard enabled, stats.running, preparing == nil, now.timeIntervalSince(runStarted) > 10 else { slowSince = nil; return }
-        if stats.recentRealTimeFactor > 0.95 {
+        // Falling behind real time for 8 s: no buffer can help. (Close to it but keeping up is fine as long as there
+        // are no dropouts; those are handled below.)
+        if stats.recentRealTimeFactor > 0.97 {
             if slowSince == nil { slowSince = now }
         } else {
             slowSince = nil
@@ -262,17 +292,16 @@ final class AppModel: ObservableObject {
                 apply()
                 return
             }
-            let slow = mode
-            tooSlow.insert(slow)
-            if let next = modeChoices.first {
-                NSLog("Vocalizer: recalibrate: %@ can't keep up on this Mac right now; switching to %@", slow.rawValue, next.rawValue)
-                mode = next // restarts (and clears any notice), so say why afterwards
-                error = L("This Mac can't run %@ right now, so Vocalizer switched to %@.", slow.title, next.title)
-            }
+            giveUp(on: mode, String(format: "using %.0f%% of real time", stats.recentRealTimeFactor * 100))
             return
         }
         let base = underrunsAfterWarmUp ?? stats.underruns
         underrunsAfterWarmUp = base
+        if stats.underruns - base >= 2, !mayRecalibrate("buffer", now, mark: false), bufferBoost[mode] != nil {
+            // Already given a bigger buffer within the last minute and still dropping out: too slow, not unlucky.
+            giveUp(on: mode, "dropouts after a bigger buffer")
+            return
+        }
         if stats.underruns - base >= 2, mayRecalibrate("buffer", now) {
             let target = min(10_000, max(stats.worstStepMs * 1.5 + 100, stats.bufferMs * 1.5))
             NSLog("Vocalizer: recalibrate %@: %d dropouts, slowest step %.0f ms; buffer %.0f -> %.0f ms",
@@ -281,10 +310,18 @@ final class AppModel: ObservableObject {
             apply()
             return
         }
-        if muteSwearWords, mode == .quality, stats.wordsLate > lateAtStart, mayRecalibrate("hold", now) {
-            // Restarting learns the arrivals seen so far (apply), so the new hold covers them.
-            NSLog("Vocalizer: recalibrate Clean's swear-word hold: %d words arrived after they played", stats.wordsLate)
-            apply()
+        let lateBase = lateAfterWarmUp ?? stats.wordsLate
+        lateAfterWarmUp = lateBase
+        if muteSwearWords, mode == .quality, stats.wordsLate > lateBase {
+            // Learn the arrivals so far; restart only if that asks for a longer hold than this run has.
+            learnSwearTiming()
+            if swearHoldMs > stats.bufferMs + 100, mayRecalibrate("hold", now) {
+                NSLog("Vocalizer: recalibrate Clean's swear-word hold: %d words arrived after they played; buffer %.0f -> %.0f ms",
+                      stats.wordsLate - lateBase, stats.bufferMs, swearHoldMs)
+                apply()
+            } else {
+                lateAfterWarmUp = stats.wordsLate
+            }
         }
     }
 
@@ -709,8 +746,11 @@ final class AppModel: ObservableObject {
                     await MainActor.run {
                         self.preparing = nil
                         if let failure { self.error = L("Best mode: %@", "\(failure)"); return }
-                        self.checkSpeeds()
-                        if self.tooSlow.contains(.supreme) { self.error = L("This Mac is too slow for Best. Clean is the closest."); return }
+                        self.checkSpeeds() // switches away from Best if it's too slow here
+                        if self.tooSlow.contains(.supreme) {
+                            self.error = L("This Mac can't run %@ right now, so Vocalizer switched to %@.", Mode.supreme.title, self.mode.title)
+                            return
+                        }
                         if self.enabled && self.mode == .supreme { self.apply() }
                     }
                 }
@@ -772,7 +812,7 @@ final class AppModel: ObservableObject {
                 try engine.start(source: source, separation: separation, jitterMs: jitterMs(sync: false))
             }
             lastHeard = Date()
-            lateAtStart = 0
+            lateAfterWarmUp = nil
             runStarted = Date()
             underrunsAfterWarmUp = nil
             starts += 1

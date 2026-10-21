@@ -104,6 +104,7 @@ public final class RoformerSeparator: Separating {
         _ = try? model.prediction(from: provider)
         let w0 = CFAbsoluteTimeGetCurrent()
         _ = try? model.prediction(from: provider)
+        TestSpeed.stretch(since: w0)
         modelCallTime = CFAbsoluteTimeGetCurrent() - w0
     }
 
@@ -204,6 +205,8 @@ public final class RoformerSeparator: Separating {
     /// Runs the network and turns its (band) mask into a full complex mask per (f s) bin.
     private func runModel() throws {
         var nsError: NSError?
+        let t0 = CFAbsoluteTimeGetCurrent()
+        defer { TestSpeed.stretch(since: t0) }
         guard let out = VCLPredict(model, provider, MLPredictionOptions(), &nsError) else {
             throw nsError ?? NSError(domain: "Roformer", code: 2, userInfo: [NSLocalizedDescriptionKey: "prediction failed"])
         }

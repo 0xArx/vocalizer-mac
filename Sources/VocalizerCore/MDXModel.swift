@@ -37,22 +37,29 @@ public final class MDXModel {
         // Check the backing is accepted; if Core ML rejects it, fall back to its own buffers.
         if (try? predict()) == nil { options.outputBackings = [:] }
         usesOutputBacking = !(options.outputBackings.isEmpty)
-        // How fast this Mac runs it (warm): the slowest of a few calls. Sizes the safety buffer per Mac.
-        var slowest = 0.0
-        for _ in 0..<3 {
+        // How fast this Mac runs it (warm), from 5 calls: the typical one decides whether a mode can run here at
+        // all, the slowest sizes the safety buffer.
+        var times: [Double] = []
+        for _ in 0..<5 {
             let t = CFAbsoluteTimeGetCurrent()
             _ = try? predict()
-            slowest = max(slowest, CFAbsoluteTimeGetCurrent() - t)
+            times.append(CFAbsoluteTimeGetCurrent() - t)
         }
-        callTime = slowest
+        times.sort()
+        callTime = times[2]
+        slowestCallTime = times[4]
     }
 
-    /// Seconds per warm call on this Mac (measured when loaded).
+    /// Seconds per warm call on this Mac (median of 5, measured when loaded).
     public private(set) var callTime = 0.0
+    /// The slowest of those calls.
+    public private(set) var slowestCallTime = 0.0
 
     /// One prediction; Objective-C exceptions from Core ML become Swift errors, and the model is reloaded.
     private func predict() throws -> MLFeatureProvider {
         var error: NSError?
+        let t0 = CFAbsoluteTimeGetCurrent()
+        defer { TestSpeed.stretch(since: t0) }
         if let out = VCLPredict(model, provider, options, &error) { return out }
         let err = error ?? NSError(domain: "MDXModel", code: 2, userInfo: [NSLocalizedDescriptionKey: "prediction failed"])
         if err.domain == "VocalizerCoreMLException" {

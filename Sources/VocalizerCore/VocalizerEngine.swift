@@ -204,13 +204,13 @@ public final class VocalizerEngine {
         case .mdx(let config):
             var m = try model(config.frames, gpu: mdxOnGPU(config))
             // A GPU too slow to keep up right now (an older Mac, or one saving battery): back to the Neural Engine.
-            if mdxOnGPU(config), m.callTime > 0.7 * Double(config.step) / MDX.sampleRate {
+            if mdxOnGPU(config), m.callTime > 0.8 * Double(config.step) / MDX.sampleRate {
                 NSLog("Vocalizer: GPU too slow for this mode right now (%.0f ms per call); using the Neural Engine", m.callTime * 1000)
                 m = try model(config.frames)
             }
             sep = StreamingSeparator(config: config, model: m)
             // The buffer must cover one model call on this Mac (measured when it loaded), with margin.
-            defaultJitter = max(config.frames >= 256 ? 250 : 100, m.callTime * 1500 + 50)
+            defaultJitter = max(config.frames >= 256 ? 250 : 100, m.slowestCallTime * 1500 + 50)
         case .deepFilter:
             guard let df = deepFilterFiles else { throw CAError(-1, "DeepFilterNet library not bundled") }
             sep = try DeepFilterSeparator(library: df.library, model: df.model)

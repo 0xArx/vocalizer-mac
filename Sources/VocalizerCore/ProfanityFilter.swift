@@ -95,6 +95,9 @@ public final class ProfanityFilter: @unchecked Sendable {
         let analyzer = SpeechAnalyzer(modules: [transcriber], options: .init(priority: .userInitiated, modelRetention: .processLifetime))
         let (stream, cont) = AsyncStream<AnalyzerInput>.makeStream(bufferingPolicy: .bufferingNewest(400))
         continuation = cont
+        // Load the recognizer's models now: cold, its first result came 4-5 s after the word, so the first swear
+        // word of a session was heard.
+        try? await analyzer.prepareToAnalyze(in: fmt)
         try await analyzer.start(inputSequence: stream)
         self.analyzer = analyzer
         resultsTask = Task { [weak self] in
@@ -188,7 +191,10 @@ public final class ProfanityFilter: @unchecked Sendable {
             guard ProfanityWords.isProfane(word) else { continue }
             guard let tr = run.audioTimeRange else { eventLog.append("untimed \(word)"); continue }
             wordsFound += 1
-            arrivalsLock.withLock { arrivals = Array((arrivals + [now - tr.end.seconds]).suffix(50)) }
+            // Not learned from the recognizer's first 10 s (it starts slowly): that would hold every word too long.
+            if tr.end.seconds - Double(firstFrame) / inputRate > 10 {
+                arrivalsLock.withLock { arrivals = Array((arrivals + [now - tr.end.seconds]).suffix(50)) }
+            }
             eventLog.append(String(format: "exact %@ %.2f-%.2f (arrived %.2f s after the word)", word,
                                    tr.start.seconds, tr.end.seconds, now - tr.end.seconds))
             // Masked words can come back very short: never mute less than `min`, growing toward the end.

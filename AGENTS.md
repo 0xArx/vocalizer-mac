@@ -123,7 +123,7 @@ Layout:
 
 Rules that matter:
 
-- **Measure, don't assume, speed.** Each model times a few calls when it loads on this Mac (`MDXModel.callTime`, `RoformerSeparator.modelCallTime`); buffers are sized from that, and a mode whose call takes too long for its step is hidden (`AppModel.checkSpeeds`). Settings › details shows the numbers.
+- **Measure, don't assume, speed.** Test slower Macs with `VOCALIZER_TEST_SPEED=<x>` (every model call x times slower) and `--sync-run`; spikes with `VOCALIZER_TEST_SLOWDOWN`. Each model times a few calls when it loads on this Mac (`MDXModel.callTime`, `RoformerSeparator.modelCallTime`); buffers are sized from that, and a mode whose call takes too long for its step is hidden (`AppModel.checkSpeeds`). Settings › details shows the numbers.
 
 - **Never block the IO thread** (`VocalizerEngine.io`): no locks, allocation, logging or Swift arrays that grow.
 - **In sync mode the delay is fixed** for the whole run (`fixedDelay: true`) and reported once. Changing it while a

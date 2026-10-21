@@ -81,7 +81,18 @@ but is no longer offered in the menu.)
   While Vocalizer is on, a checker compares what was calibrated with what happens: two dropouts grow the buffer
   to cover the slowest recent step and restart the mode; a mode that falls behind for 8 s switches to a lighter
   one (and says so); a swear word arriving after it played restarts Clean with a longer hold. At most one of each
-  per mode a minute (20 s for the hold). Settings › details shows the measured speeds.
+  per mode a minute (20 s for the hold), and nothing during a run's first 10 s (warm-up). Settings › details
+  shows the measured speeds. Tested on an M2 and on simulated slower Macs (`VOCALIZER_TEST_SPEED=2/4/8` makes
+  every model call that much slower, calibration included), full app with video sync:
+
+  | Mode (M2 speed x) | 1x | 2x | 4x | 8x |
+  |---|---|---|---|---|
+  | Fast | 0.43 s, no dropouts | 0.43 s, no dropouts | too slow: switches to Clean, says so | switches to Calls (Clean too slow too) |
+  | Clean | 1.96 s | 2.04 s | 2.34 s (bigger buffer) | 3.0 s, at 86% of real time, no dropouts |
+  | Best | 7.3 s | too slow: Clean, says so | Clean | Calls |
+  | Clean + swear filter | 10/10 words muted | 9/9 | 10/10 | hold grows to fit |
+
+  A 3-minute run at normal speed makes no recalibrations.
 - **⌥⇧V** (Option-Shift-V) switches it on or off from anywhere.
 - **Waiting is visible.** With Best (and Clean), videos hold their picture until the voice arrives: the menu shows
   "Video starts in 6 s" with a progress bar, a countdown ring appears in the middle of the screen (like the volume
