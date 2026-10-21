@@ -6,6 +6,21 @@
     <description>Updates for Vocalizer for Mac</description>
     <language>en</language>
     <item>
+      <title>Vocalizer 0.3.14</title>
+      <sparkle:version>29</sparkle:version>
+      <sparkle:shortVersionString>0.3.14</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.2</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 21 Oct 2026 06:24:59 GMT</pubDate>
+      <description><![CDATA[
+        <ul>
+          <li>Mute swear words now mutes just the word: about a quarter second of the speech around it instead of over a second</li>
+          <li>Vocalizer measures how fast your Mac runs each mode and sizes its buffers to match</li>
+          <li>While it plays, it checks itself: dropouts, a mode that can&#x27;t keep up, or a swear word caught too late make it recalibrate</li>
+        </ul>
+      ]]></description>
+      <enclosure url="https://github.com/0xArx/vocalizer-mac/releases/download/v0.3.14/Vocalizer-macOS.zip" sparkle:edSignature="A0i9/qaQxsqneKlORF+l7coYu+SXeCl9Tn/ijNBj0wQAJpNn2hyQvt3CqHNu/ZfQqlgT9rfpUdMc9lqFVfU2Dw==" length="111275584" type="application/octet-stream"/>
+    </item>
+    <item>
       <title>Vocalizer 0.3.13</title>
       <sparkle:version>28</sparkle:version>
       <sparkle:shortVersionString>0.3.13</sparkle:shortVersionString>
