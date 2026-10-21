@@ -22,6 +22,10 @@ public struct EngineStats {
     /// Separation compute time / audio time (lower is better; must stay below 1).
     public var realTimeFactor = 0.0
     public var stepMs = 0.0, worstStepMs = 0.0, modelMs = 0.0
+    /// Compute time / audio time over the last ~10 steps (realTimeFactor averages the whole run).
+    public var recentRealTimeFactor = 0.0
+    /// Safety buffer this run started with (covers slow steps; sized from this Mac's measured speed).
+    public var bufferMs = 0.0
     public var underruns = 0
     /// Swear-word filter: on, words muted in time, words heard before they could be muted.
     public var profanityFilter = false
@@ -161,7 +165,10 @@ public final class VocalizerEngine {
     }
 
     /// Whether Clean (and the other MDX modes) should avoid the Neural Engine right now.
-    private func mdxOnGPU(_ config: SeparatorConfig) -> Bool { filterWanted && config.frames >= 256 }
+    private func mdxOnGPU(_ config: SeparatorConfig) -> Bool { filterWanted && config.frames >= 256 && !gpuTooSlow }
+    /// Set by the app when the GPU couldn't keep up while running (battery saving, a busy GPU): until the next
+    /// launch, Clean stays on the Neural Engine even with the swear-word filter on.
+    public var gpuTooSlow = false
 
     /// Measured seconds per model call on this Mac, per mode's model (after it has loaded).
     public func callTime(frames: Int, gpu: Bool = false) -> Double? {
@@ -325,6 +332,7 @@ public final class VocalizerEngine {
 
         statsLock.lock()
         _stats = EngineStats()
+        _stats.bufferMs = jitter
         _stats.running = true
         _stats.sampleRate = rate
         _stats.outputDevice = AudioProcesses.name(of: output) ?? "output"
@@ -515,10 +523,10 @@ public final class VocalizerEngine {
         }
     }
 
-    /// How many seconds after each swear word its exact time arrived on this Mac (newest last).
-    public var swearArrivals: [Double] {
+    /// How many seconds after each swear word its exact time arrived on this Mac, since the last call.
+    public func takeSwearArrivals() -> [Double] {
         filterLock.lock(); let f = filterObject; filterLock.unlock()
-        if #available(macOS 26.0, iOS 26.0, *), let pf = f as? ProfanityFilter { return pf.arrivals }
+        if #available(macOS 26.0, iOS 26.0, *), let pf = f as? ProfanityFilter { return pf.takeArrivals() }
         return []
     }
 
@@ -617,7 +625,11 @@ public final class VocalizerEngine {
         var inter = [Float](repeating: 0, count: Int(rate * 4) * 2)
         var l = [Float](), r = [Float](), out = [Float]()
         var computeTime = 0.0, modelTime = 0.0, steps = 0, worst = 0.0
-        var audioTime = 0.0
+        var audioTime = 0.0, recent = 0.0
+        // Test hook: VOCALIZER_TEST_SLOWDOWN="<after s>:<extra ms>" makes every step that much slower after a while
+        // (as on a busy or battery-saving Mac), to exercise the app's recalibration.
+        // "<after s>:<extra ms>:<every n steps>" makes only every n-th step slow (spikes rather than a steady load).
+        let slowdown = ProcessInfo.processInfo.environment["VOCALIZER_TEST_SLOWDOWN"]?.split(separator: ":").compactMap { Double($0) }
         while !Thread.current.isCancelled {
             _ = wake.wait(timeout: .now() + .milliseconds(100))
             guard let sep = separator, let inRing, let outRing else { continue }
@@ -636,12 +648,20 @@ public final class VocalizerEngine {
                     for i in 0..<m { out.append(up.outL[i]); out.append(up.outR[i]) }
                     _ = cring_write(outRing, out, UInt32(m))
                 }) {
+                    var stepTime = sep.lastStepTime
+                    if let sl = slowdown, sl.count >= 2, audioTime >= sl[0], sl.count < 3 || steps % max(1, Int(sl[2])) == 0 {
+                        Thread.sleep(forTimeInterval: sl[1] / 1000)
+                        stepTime += sl[1] / 1000
+                    }
                     steps += 1
-                    computeTime += sep.lastStepTime
+                    computeTime += stepTime
                     modelTime += sep.lastModelTime
-                    worst = max(worst * 0.999, sep.lastStepTime)
-                    audioTime += Double(sep.step) / sep.sampleRate
+                    worst = max(worst * 0.999, stepTime)
+                    let stepAudio = Double(sep.step) / sep.sampleRate
+                    audioTime += stepAudio
+                    recent = steps == 1 ? stepTime / stepAudio : recent * 0.9 + 0.1 * stepTime / stepAudio
                     statsLock.lock()
+                    _stats.recentRealTimeFactor = recent
                     _stats.realTimeFactor = computeTime / audioTime
                     _stats.stepMs = computeTime / Double(steps) * 1000
                     _stats.modelMs = modelTime / Double(steps) * 1000

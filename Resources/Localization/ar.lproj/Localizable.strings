@@ -112,3 +112,4 @@
 "This Mac is too slow for Best. Clean is the closest." = "هذا الـ Mac أبطأ من أن يشغّل «الأفضل». أقرب وضع إليه هو «نقي».";
 "This Mac: %@" = "هذا الـ Mac: %@";
 "too slow" = "أبطأ من اللازم";
+"This Mac can't run %@ right now, so Vocalizer switched to %@." = "لا يستطيع هذا الـ Mac تشغيل «%@» الآن، فانتقل Vocalizer إلى «%@».";

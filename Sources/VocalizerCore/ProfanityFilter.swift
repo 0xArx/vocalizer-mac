@@ -51,7 +51,10 @@ public final class ProfanityFilter: @unchecked Sendable {
     /// The newest captured frame handed to the recognizer (to measure how late results arrive).
     private var latestFrame: Int64 = 0
     /// How many seconds after each swear word its exact time arrived (newest last, up to 50).
-    public private(set) var arrivals: [Double] = [] { didSet { if arrivals.count > 50 { arrivals.removeFirst(arrivals.count - 50) } } }
+    private var arrivals: [Double] = []
+    private let arrivalsLock = NSLock()
+    /// Hands over the arrivals recorded so far and forgets them (so each is learned once). Any thread.
+    public func takeArrivals() -> [Double] { arrivalsLock.withLock { defer { arrivals.removeAll() }; return arrivals } }
     /// Diagnostics: every mute placed, in capture seconds, with the word.
     public private(set) var eventLog: [String] = [] { didSet { if eventLog.count > 50 { eventLog.removeFirst(eventLog.count - 50) } } }
     public private(set) var anchorFrame: Int64 = -1
@@ -165,11 +168,13 @@ public final class ProfanityFilter: @unchecked Sendable {
     }
 
     /// Padding around the recognizer's word time, in seconds: before, after, and the shortest mute.
-    /// Measured against exact word times: the recognizer places a word's start ~0.12 s early (up to 0.38 s) and its
-    /// end ~0.1 s early (-0.29..+0.13 s), so the mute starts a little after the reported start and runs past the end. Tunable for tests with VOCALIZER_SWEAR_PAD="before,after,min".
+    /// Measured against exact word times (27 words, 4 live runs): the recognizer's word edges are off by up to
+    /// -0.41..+0.16 s (start) and -0.28..+0.22 s (end). A swear word half muted is still heard, so the padding
+    /// favours covering the word: 0.1 s before and 0.2 s after mutes 22 of 27 words completely (the worst 82%)
+    /// and cuts ~0.35 s of the speech around each one (the old quick-result windows cut ~1.5 s). Tunable for tests with VOCALIZER_SWEAR_PAD="before,after,min".
     private static let pad: (before: Double, after: Double, min: Double) = {
         let v = (ProcessInfo.processInfo.environment["VOCALIZER_SWEAR_PAD"] ?? "").split(separator: ",").compactMap { Double($0) }
-        return v.count == 3 ? (v[0], v[1], v[2]) : (-0.03, 0.06, 0.3)
+        return v.count == 3 ? (v[0], v[1], v[2]) : (0.1, 0.2, 0.3)
     }()
 
     private func handle(_ result: SpeechTranscriber.Result) {
@@ -183,7 +188,7 @@ public final class ProfanityFilter: @unchecked Sendable {
             guard ProfanityWords.isProfane(word) else { continue }
             guard let tr = run.audioTimeRange else { eventLog.append("untimed \(word)"); continue }
             wordsFound += 1
-            arrivals.append(now - tr.end.seconds)
+            arrivalsLock.withLock { arrivals = Array((arrivals + [now - tr.end.seconds]).suffix(50)) }
             eventLog.append(String(format: "exact %@ %.2f-%.2f (arrived %.2f s after the word)", word,
                                    tr.start.seconds, tr.end.seconds, now - tr.end.seconds))
             // Masked words can come back very short: never mute less than `min`, growing toward the end.

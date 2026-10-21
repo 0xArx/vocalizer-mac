@@ -67,10 +67,21 @@ but is no longer offered in the menu.)
   **Output** picker in the Vocalizer menu switches it directly.
 - With sync off, you can pick a single app to filter (Source).
 - **Mute swear words** (Settings): silences swear words, recognised on your Mac by Apple's speech recognition
-  (macOS 26+). It works inside the delay a mode already has, so while it's on the menu offers only **Clean** and
-  **Best** (it switches to Clean, and back when you turn it off): in Fast and Calls a word plays before it can be
-  recognised. Measured on a test clip with 6 swear words over music (2026-10-20): **Best** 5 fully + 1 partly,
-  precisely; **Clean** 6 of 6, but with wider mutes (about a second around each word); Fast 0 of 6.
+  (macOS 26+). A word is muted from its exact time in the recogniser's final result, so while it's on the menu
+  offers only **Clean** and **Best** (it switches to Clean, and back when you turn it off): Fast and Calls play a
+  word before its exact time arrives. In Clean the model then runs on the GPU (sharing the Neural Engine with the
+  recogniser made its word times slip by up to a second) and the sound is held long enough for those times
+  (learned on each Mac; about 4 s on an M2). Measured on a clip with exact word times (`tools/make_swear_fixture.py`,
+  `tools/analyze_profanity.py`), 8 swear words over music: every word recognised is 82-100% muted, and about
+  0.26 s of the speech around each one is cut (before: about 0.7 s in Clean, with windows over a second wide).
+  The recogniser's word edges are only accurate to about ±0.2 s, which sets that limit. Words it mishears
+  (a synthetic "crap" heard as "crack") are missed.
+- **Calibrated to each Mac, and checked while it plays.** Every model times a few calls when it loads (each
+  launch) and the safety buffers are sized from that; a mode this Mac can't run in real time is hidden.
+  While Vocalizer is on, a checker compares what was calibrated with what happens: two dropouts grow the buffer
+  to cover the slowest recent step and restart the mode; a mode that falls behind for 8 s switches to a lighter
+  one (and says so); a swear word arriving after it played restarts Clean with a longer hold. At most one of each
+  per mode a minute (20 s for the hold). Settings › details shows the measured speeds.
 - **⌥⇧V** (Option-Shift-V) switches it on or off from anywhere.
 - **Waiting is visible.** With Best (and Clean), videos hold their picture until the voice arrives: the menu shows
   "Video starts in 6 s" with a progress bar, a countdown ring appears in the middle of the screen (like the volume

@@ -184,28 +184,108 @@ final class AppModel: ObservableObject {
 
     // MARK: how long Clean holds the sound for the swear-word filter (learned on this Mac)
 
-    /// The filter mutes a word only once its exact time arrives, 1.4-3 s after the word on an M-series Mac
+    /// The filter mutes a word only once its exact time arrives, 1.4-3.5 s after the word on an M-series Mac
     /// (slower Macs take longer). Clean holds the sound long enough for that: the slowest arrivals seen here
-    /// (90th percentile) plus a long word, starting from 3 s before anything has been measured.
+    /// (90th percentile) plus a long word, never planning for less than 2.5 s (3 s before anything is measured).
+    /// If a word still arrives too late, the calibration checker restarts Clean with the hold learned so far.
     private var swearHoldMs: Double {
-        let seen = (UserDefaults.standard.array(forKey: "swearArrivals") as? [Double]) ?? []
-        let p90 = seen.count >= 5 ? seen.sorted()[Int(Double(seen.count - 1) * 0.9)] : 3.0
-        let total = min(8.0, max(3.0, p90) + 0.9)
+        let floor = Double(ProcessInfo.processInfo.environment["VOCALIZER_TEST_SWEAR_FLOOR"] ?? "") ?? 2.5
+        let p90 = swearSeen.count >= 5 ? swearSeen.sorted()[Int(Double(swearSeen.count - 1) * 0.9)] : 3.0
+        // ...and always the slowest of the last 10, so a Mac that got slower (battery saving, busy) is covered at once.
+        let recent = swearSeen.suffix(10).max() ?? 0
+        let total = min(8.0, max(floor, p90, recent) + 0.9)
         return max(300, total * 1000 - Mode.quality.latencyMs - 35)
     }
 
-    /// Remembers how late exact word times arrived in this session (the newest 60).
+    /// Seconds from each swear word to its exact time on this Mac (the newest 60; saved in settings).
+    /// Test hook: VOCALIZER_TEST_SWEAR_SEEN=<s> pretends 10 earlier words arrived that fast.
+    private var swearSeen: [Double] = ProcessInfo.processInfo.environment["VOCALIZER_TEST_SWEAR_SEEN"].flatMap(Double.init).map { Array(repeating: $0, count: 10) }
+        ?? (UserDefaults.standard.array(forKey: "swearArrivals") as? [Double]) ?? []
+
+    /// Remembers how late exact word times arrived since the last call.
     private func learnSwearTiming() {
-        let new = engine.swearArrivals
-        guard !new.isEmpty, !AppModel.testing else { return }
-        let seen = (UserDefaults.standard.array(forKey: "swearArrivals") as? [Double]) ?? []
-        UserDefaults.standard.set(Array((seen + new).suffix(60)), forKey: "swearArrivals")
+        let new = engine.takeSwearArrivals()
+        guard !new.isEmpty else { return }
+        swearSeen = Array((swearSeen + new).suffix(60))
+        if !AppModel.testing { UserDefaults.standard.set(swearSeen, forKey: "swearArrivals") }
     }
 
     /// Extra buffering for `mode` right now (nil: the engine's own default for the mode).
     private func jitterMs(sync: Bool) -> Double? {
-        if muteSwearWords && mode == .quality { return swearHoldMs }
-        return sync ? mode.syncJitterMs : nil
+        let base = muteSwearWords && mode == .quality ? swearHoldMs : (sync ? mode.syncJitterMs : nil)
+        guard let boost = bufferBoost[mode] else { return base }
+        return max(base ?? 0, boost)
+    }
+
+    // MARK: calibration checker (runs while Vocalizer is on)
+
+    /// Buffers raised this session because the Mac ran slower than measured at load (glitches seen).
+    private var bufferBoost: [Mode: Double] = [:]
+    /// When each kind of recalibration last happened, per mode ("buffer", "hold", "gpu", "speed").
+    private var lastRecalibration: [String: Date] = [:]
+    private var slowSince: Date?
+    private var lateAtStart = 0
+    private var runStarted = Date.distantPast
+    /// Dropouts already counted when the run's warm-up ended (only later ones mean the buffer is too small).
+    private var underrunsAfterWarmUp: Int?
+
+    private func mayRecalibrate(_ kind: String, _ now: Date) -> Bool {
+        let key = "\(kind)-\(mode.rawValue)"
+        // Every late swear word is heard, so that one may act sooner.
+        guard now.timeIntervalSince(lastRecalibration[key] ?? .distantPast) > (kind == "hold" ? 20 : 60) else { return false }
+        lastRecalibration[key] = now
+        return true
+    }
+
+    /// Checks that what was calibrated still holds while playing, and recalibrates when it doesn't:
+    /// - sound dropping out: the Mac is slower now than when the model loaded (battery saving, heat, other apps).
+    ///   The buffer grows to cover the slowest recent step, and the mode restarts.
+    /// - the model can't keep up at all for a while: no buffer helps; switch to a lighter mode and say so.
+    /// - a swear word played before its exact time arrived: Clean's hold was too short for this Mac;
+    ///   learn the new timing and restart with a longer hold.
+    /// At most one recalibration of each kind per mode a minute (20 s for the swear-word hold), so it can't keep
+    /// restarting.
+    private func checkCalibration() {
+        let now = Date()
+        // Not in the first 10 s of a run: the first model calls (GPU warm-up) are slow and would look like a slow Mac.
+        guard enabled, stats.running, preparing == nil, now.timeIntervalSince(runStarted) > 10 else { slowSince = nil; return }
+        if stats.recentRealTimeFactor > 0.95 {
+            if slowSince == nil { slowSince = now }
+        } else {
+            slowSince = nil
+        }
+        if let since = slowSince, now.timeIntervalSince(since) > 8 {
+            slowSince = nil
+            if mode == .quality && muteSwearWords && !engine.gpuTooSlow && mayRecalibrate("gpu", now) {
+                NSLog("Vocalizer: recalibrate: the GPU can't keep up with Clean right now; back to the Neural Engine")
+                engine.gpuTooSlow = true
+                apply()
+                return
+            }
+            let slow = mode
+            tooSlow.insert(slow)
+            if let next = modeChoices.first {
+                NSLog("Vocalizer: recalibrate: %@ can't keep up on this Mac right now; switching to %@", slow.rawValue, next.rawValue)
+                mode = next // restarts (and clears any notice), so say why afterwards
+                error = L("This Mac can't run %@ right now, so Vocalizer switched to %@.", slow.title, next.title)
+            }
+            return
+        }
+        let base = underrunsAfterWarmUp ?? stats.underruns
+        underrunsAfterWarmUp = base
+        if stats.underruns - base >= 2, mayRecalibrate("buffer", now) {
+            let target = min(10_000, max(stats.worstStepMs * 1.5 + 100, stats.bufferMs * 1.5))
+            NSLog("Vocalizer: recalibrate %@: %d dropouts, slowest step %.0f ms; buffer %.0f -> %.0f ms",
+                  mode.rawValue, stats.underruns - base, stats.worstStepMs, stats.bufferMs, target)
+            bufferBoost[mode] = target
+            apply()
+            return
+        }
+        if muteSwearWords, mode == .quality, stats.wordsLate > lateAtStart, mayRecalibrate("hold", now) {
+            // Restarting learns the arrivals seen so far (apply), so the new hold covers them.
+            NSLog("Vocalizer: recalibrate Clean's swear-word hold: %d words arrived after they played", stats.wordsLate)
+            apply()
+        }
     }
 
     /// Expected capture-to-speaker delay in seconds, as the menu shows it.
@@ -692,6 +772,9 @@ final class AppModel: ObservableObject {
                 try engine.start(source: source, separation: separation, jitterMs: jitterMs(sync: false))
             }
             lastHeard = Date()
+            lateAtStart = 0
+            runStarted = Date()
+            underrunsAfterWarmUp = nil
             starts += 1
             status = "On"
             startCatchUp()
@@ -790,6 +873,7 @@ final class AppModel: ObservableObject {
         if !ready { return }
         if enabled && !engine.stats.running { apply() }
         stats = engine.stats
+        if ticks % 4 == 2 { checkCalibration() }
         // Sound starting after a pause (a new video, play, or a seek): videos hold their picture for our
         // delay, so count it down.
         // (Paused players send digital silence; real quiet passages stay above -80 dB.)

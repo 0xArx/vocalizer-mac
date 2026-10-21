@@ -212,15 +212,17 @@ if let i = args.firstIndex(of: "--sync-run"), args.count >= i + 4 {
                 guard model.ready else { return }
                 if t0 == nil {
                     model.mode = Mode(rawValue: args[i + 1]) ?? .live
+                    // VOCALIZER_TEST_SWEAR=1: with Mute swear words on (not saved).
+                    if ProcessInfo.processInfo.environment["VOCALIZER_TEST_SWEAR"] == "1" { model.muteSwearWords = true }
                     model.syncVideo = true
                     model.enabled = true
                     t0 = Date()
                 }
                 let s = model.stats
                 let dev = (try? AudioProcesses.defaultOutputDevice()).flatMap { AudioProcesses.name(of: $0) } ?? "?"
-                lines.append(String(format: "t=%4.1f perm=%@ silent=%.0f mode=%@ preparing=%@ catchup=%@ out=%@ default=%@ starts=%d reported=%.0f total=%.0f underruns=%d in=%.3f out=%.3f rtf=%.2f err=%@",
+                lines.append(String(format: "t=%4.1f perm=%@ silent=%.0f mode=%@ preparing=%@ catchup=%@ out=%@ default=%@ starts=%d reported=%.0f total=%.0f underruns=%d in=%.3f out=%.3f rtf=%.2f buffer=%.0f swear=%d/%d late err=%@",
                                     Date().timeIntervalSince(t0!), "\(model.audioPermission)", model.silentFor, model.mode.title, model.preparing?.title ?? "-", model.catchUpSeconds.map(String.init) ?? "-", s.outputDevice, dev, model.starts, model.reportedLatencyMs, s.totalLatencyMs,
-                                    s.underruns, s.inputPeak, s.outputPeak, s.realTimeFactor, model.error ?? "-"))
+                                    s.underruns, s.inputPeak, s.outputPeak, s.realTimeFactor, s.bufferMs, s.wordsMuted, s.wordsLate, model.error ?? "-"))
                 try? lines.joined(separator: "\n").write(to: logURL, atomically: true, encoding: .utf8)
                 // VOCALIZER_TEST_WAKE=<s>: post the "Mac woke up" notification once, at that time.
                 if let w = ProcessInfo.processInfo.environment["VOCALIZER_TEST_WAKE"].flatMap(Double.init),
